@@ -2,10 +2,12 @@
 // Licensed under the MIT License.
 
 using Files.App.Helpers.Application;
+using Files.App.Services.Cloud;
 using Files.App.Services.Git;
 using Files.App.Services.SizeProvider;
 using Files.App.Utils.Logger;
 using Files.App.ViewModels.Settings;
+using Files.Shared.Cloud;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
@@ -319,6 +321,7 @@ namespace Files.App.Helpers
 					.AddSingleton<ILayoutSettingsService, LayoutSettingsService>(sp => new LayoutSettingsService(((UserSettingsService)sp.GetRequiredService<IUserSettingsService>()).GetSharingContext()))
 					.AddSingleton<IAppSettingsService, AppSettingsService>(sp => new AppSettingsService(((UserSettingsService)sp.GetRequiredService<IUserSettingsService>()).GetSharingContext()))
 					.AddSingleton<IActionsSettingsService, ActionsSettingsService>(sp => new ActionsSettingsService(((UserSettingsService)sp.GetRequiredService<IUserSettingsService>()).GetSharingContext()))
+					.AddSingleton<ICloudOptimizationSettingsService, CloudOptimizationSettingsService>(sp => new CloudOptimizationSettingsService(((UserSettingsService)sp.GetRequiredService<IUserSettingsService>()).GetSharingContext()))
 					.AddSingleton<IFileTagsSettingsService, FileTagsSettingsService>()
 					// Contexts
 					.AddSingleton<IMultiPanesContext, MultiPanesContext>()
@@ -365,6 +368,16 @@ namespace Files.App.Helpers
 					.AddSingleton<IStorageSecurityService, StorageSecurityService>()
 					.AddSingleton<IWindowsCompatibilityService, WindowsCompatibilityService>()
 					.AddSingleton</*IVersionControlService,*/ LibGit2Service>()
+					// Cloud provider optimization (see docs/adr/0001-provider-aware-poc-scope.md)
+					.AddSingleton<ICloudLocationClassifier>(sp => new CloudLocationClassifier(
+						sp.GetRequiredService<ICloudOptimizationSettingsService>().EgnyteConfiguredRoots,
+						MappedDriveResolver.GetRemoteName))
+					.AddSingleton<ICloudInteractionTelemetry>(sp =>
+					{
+						var settings = sp.GetRequiredService<ICloudOptimizationSettingsService>();
+						return new CloudInteractionTelemetry(() => settings.Mode, sp.GetRequiredService<ILogger<CloudInteractionTelemetry>>());
+					})
+					.AddSingleton<CloudTelemetryExportHost>()
 					// ViewModels
 					.AddSingleton<MainPageViewModel>()
 					.AddSingleton<InfoPaneViewModel>()

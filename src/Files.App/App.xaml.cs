@@ -160,6 +160,9 @@ namespace Files.App
 				if (AppLifecycleHelper.AppEnvironment is not AppEnvironment.Dev)
 					AppLifecycleHelper.ConfigureSentry();
 
+				// Start cloud telemetry export; no-op unless Observe/Protect mode with telemetry enabled
+				Ioc.Default.GetRequiredService<Services.Cloud.CloudTelemetryExportHost>().Start();
+
 				var userSettingsService = Ioc.Default.GetRequiredService<IUserSettingsService>();
 				var isLeaveAppRunning = userSettingsService.GeneralSettingsService.LeaveAppRunning;
 
@@ -302,6 +305,9 @@ namespace Files.App
 
 			// Persist the final active stretch; it is reported on the next launch
 			ActiveSessionTracker.OnActivationChanged(false);
+
+			// Flush and stop cloud telemetry export
+			Ioc.Default.GetRequiredService<Services.Cloud.CloudTelemetryExportHost>().Dispose();
 
 			// Save the current tab list in case it was overwriten by another instance
 			if (userSettingsService.GeneralSettingsService.ContinueLastSessionOnStartUp || userSettingsService.AppSettingsService.RestoreTabsOnStartup)
