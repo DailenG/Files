@@ -1,0 +1,219 @@
+# Copyright (c) Files Community
+# Licensed under the MIT License.
+
+# Abstract:
+#  Builds the Files Cloud Guard proof-of-concept sideload package and publishes it to GitHub Releases.
+#
+# Workflow:
+#  1. Configure the manifest for the POC identity (installs alongside production Files)
+#  2. Restore, build and package for x64 and arm64
+#  3. Sign with Azure Trusted Signing when configured, otherwise with a generated self-signed certificate
+#  4. Publish the msixbundle, dependencies and pilot documentation to a GitHub release
+
+name: Files CD (Cloud Guard POC)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to create, for example v0.1.0-poc'
+        required: true
+        default: 'v0.1.0-poc'
+      prerelease:
+        description: 'Mark the release as a prerelease'
+        type: boolean
+        default: true
+
+jobs:
+  build:
+    runs-on: windows-2025-vs2026
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Release]
+        platform: [x64]
+    env:
+      SOLUTION_NAME:         'Files.slnx'
+      CONFIGURATION:         '${{ matrix.configuration }}'
+      PLATFORM:              '${{ matrix.platform }}'
+      APPX_BUNDLE_PLATFORMS: 'x64|arm64'
+      WORKING_DIR:           '${{ github.workspace }}'
+      ARTIFACTS_STAGING_DIR: '${{ github.workspace }}\artifacts'
+      APPX_PACKAGE_DIR:      '${{ github.workspace }}\artifacts\AppxPackages\'
+      APP_PROJECT_PATH:      'src\Files.App\Files.App.csproj'
+      PACKAGE_MANIFEST_PATH: 'src\Files.App\Package.appxmanifest'
+      LAUNCHER_PROJECT_PATH: 'src\Files.App.Launcher\Files.App.Launcher.vcxproj'
+
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v6
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v3
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        global-json-file: global.json
+
+    - name: Decide how the package will be signed
+      id: signing
+      shell: pwsh
+      run: |
+        $trusted = [bool]$env:AZURE_TENANT_ID -and [bool]$env:SIGNING_ACCOUNT_NAME
+        "trusted=$($trusted.ToString().ToLower())" | Out-File $env:GITHUB_OUTPUT -Append
+        # A self-signed publisher must match the manifest Identity/Publisher exactly
+        $publisher = if ($trusted) { $env:SIDELOAD_PUBLISHER_SECRET } else { 'CN=Files' }
+        "publisher=$publisher" | Out-File $env:GITHUB_OUTPUT -Append
+        Write-Host "Azure Trusted Signing: $trusted"
+      env:
+        AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        SIGNING_ACCOUNT_NAME: ${{ secrets.SIGNING_ACCOUNT_NAME }}
+        SIDELOAD_PUBLISHER_SECRET: ${{ secrets.SIDELOAD_PUBLISHER_SECRET }}
+
+    - name: Configure the package manifest, logo, and secrets
+      shell: pwsh
+      run: |
+        . './.github/scripts/Configure-AppxManifest.ps1' `
+          -Branch "SideloadPoc" `
+          -PackageManifestPath "$env:PACKAGE_MANIFEST_PATH" `
+          -Publisher "${{ steps.signing.outputs.publisher }}" `
+          -WorkingDir "$env:WORKING_DIR" `
+          -SecretBingMapsKey "$env:SECRET_BINGMAPS_KEY" `
+          -SecretSentry "$env:SECRET_SENTRY" `
+          -SecretGitHubOAuthClientId "$env:SECRET_GITHUB_OAUTH_CLIENT_ID"
+      env:
+        SECRET_BINGMAPS_KEY: ${{ secrets.BING_MAPS_SECRET }}
+        SECRET_SENTRY: ${{ secrets.SENTRY_SECRET }}
+        SECRET_GITHUB_OAUTH_CLIENT_ID: ${{ secrets.GH_OAUTH_CLIENT_ID }}
+
+    - name: Restore Files
+      shell: pwsh
+      run: |
+        msbuild $env:SOLUTION_NAME `
+        -t:Restore `
+        -p:Platform=$env:PLATFORM `
+        -p:Configuration=$env:CONFIGURATION `
+        -p:PublishReadyToRun=true `
+        -v:quiet
+
+    - name: Restore NuGet packages for the launcher project
+      shell: pwsh
+      run: |
+        nuget restore "$env:LAUNCHER_PROJECT_PATH" -SolutionDirectory "$env:WORKING_DIR"
+
+    - name: Build the launcher project
+      shell: pwsh
+      run: |
+        msbuild "$env:LAUNCHER_PROJECT_PATH" `
+        -t:Build `
+        -p:Platform=$env:PLATFORM `
+        -p:Configuration=$env:CONFIGURATION `
+        -v:quiet
+
+    - name: Generate a self-signed certificate
+      if: steps.signing.outputs.trusted != 'true'
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path "$env:ARTIFACTS_STAGING_DIR" | Out-Null
+        . './.github/scripts/Generate-SelfCertPfx.ps1' -Destination "$env:ARTIFACTS_STAGING_DIR\FilesCloudGuard.pfx"
+        $cert = Get-PfxCertificate -FilePath "$env:ARTIFACTS_STAGING_DIR\FilesCloudGuard.pfx"
+        Export-Certificate -Cert $cert -FilePath "$env:ARTIFACTS_STAGING_DIR\FilesCloudGuard.cer" | Out-Null
+        "PFX_PATH=$env:ARTIFACTS_STAGING_DIR\FilesCloudGuard.pfx" | Out-File $env:GITHUB_ENV -Append
+
+    - name: Build and package Files Cloud Guard
+      shell: pwsh
+      run: |
+        $signArgs = if ($env:PFX_PATH) {
+          @("-p:AppxPackageSigningEnabled=true", "-p:PackageCertificateKeyFile=$env:PFX_PATH")
+        } else {
+          @("-p:AppxPackageSigningEnabled=false")
+        }
+        foreach ($plat in ("$env:APPX_BUNDLE_PLATFORMS" -split '\|')) {
+          Write-Host "Building for $plat..."
+          msbuild "$env:APP_PROJECT_PATH" `
+            -t:Build `
+            -p:Platform=$plat `
+            -p:Configuration=$env:CONFIGURATION `
+            -p:AppxPackageDir="$env:APPX_PACKAGE_DIR" `
+            -p:AppxBundle=Never `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:UapAppxPackageBuildMode=Sideload `
+            @signArgs `
+            -v:quiet
+        }
+
+    - name: Create the msixbundle
+      shell: pwsh
+      run: |
+        . './.github/scripts/Create-MsixBundle.ps1' `
+          -AppxPackageDir "$env:APPX_PACKAGE_DIR" `
+          -BundleName "Files.CloudGuard" `
+          -PackageManifestPath "$env:PACKAGE_MANIFEST_PATH" `
+          -BuildMode "SideloadOnly"
+
+    - name: Remove empty files from the packages
+      shell: bash
+      run: find "$ARTIFACTS_STAGING_DIR" -empty -delete
+
+    - name: Hide NuGet.Config from the signing action
+      if: steps.signing.outputs.trusted == 'true'
+      shell: pwsh
+      run: Move-Item NuGet.Config NuGet.Config.bak
+
+    - name: Sign with Azure Trusted Signing
+      if: steps.signing.outputs.trusted == 'true'
+      uses: Azure/artifact-signing-action@v1
+      with:
+        azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+        endpoint: https://eus.codesigning.azure.net/
+        signing-account-name: ${{ secrets.SIGNING_ACCOUNT_NAME }}
+        certificate-profile-name: ${{ secrets.SIGNING_PROFILE_NAME }}
+        files-folder: ${{ env.APPX_PACKAGE_DIR }}
+        files-folder-filter: msixbundle
+        files-folder-recurse: true
+        files-folder-depth: 4
+        file-digest: SHA256
+        timestamp-rfc3161: http://timestamp.acs.microsoft.com
+        timestamp-digest: SHA256
+
+    - name: Restore NuGet.Config
+      if: always() && steps.signing.outputs.trusted == 'true'
+      shell: pwsh
+      run: Move-Item NuGet.Config.bak NuGet.Config
+
+    - name: Stage the release assets
+      shell: pwsh
+      run: |
+        $stage = "$env:ARTIFACTS_STAGING_DIR\release"
+        New-Item -ItemType Directory -Force -Path $stage | Out-Null
+        Get-ChildItem "$env:APPX_PACKAGE_DIR" -Recurse -Include *.msixbundle | ForEach-Object { Copy-Item $_.FullName $stage }
+        $deps = Get-ChildItem "$env:APPX_PACKAGE_DIR" -Recurse -Directory | Where-Object Name -eq 'Dependencies' | Select-Object -First 1
+        if ($deps) { Compress-Archive -Path "$($deps.FullName)\*" -DestinationPath "$stage\Dependencies.zip" -Force }
+        if (Test-Path "$env:ARTIFACTS_STAGING_DIR\FilesCloudGuard.cer") { Copy-Item "$env:ARTIFACTS_STAGING_DIR\FilesCloudGuard.cer" $stage }
+        Copy-Item 'docs\pilot-runbook.md' $stage
+        Get-ChildItem $stage | Select-Object Name, Length
+
+    - name: Publish the GitHub release
+      shell: pwsh
+      run: |
+        $notes = Get-Content 'docs\poc-release-notes.md' -Raw
+        $notes | Set-Content "$env:RUNNER_TEMP\notes.md"
+        $args = @('release', 'create', '${{ inputs.tag }}',
+          '--title', 'Files Cloud Guard ${{ inputs.tag }}',
+          '--notes-file', "$env:RUNNER_TEMP\notes.md")
+        if ('${{ inputs.prerelease }}' -eq 'true') { $args += '--prerelease' }
+        $args += (Get-ChildItem "$env:ARTIFACTS_STAGING_DIR\release" -File | ForEach-Object { $_.FullName })
+        gh @args
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload the packages to GitHub Actions
+      uses: actions/upload-artifact@v7
+      with:
+        name: 'Cloud Guard POC (${{ env.CONFIGURATION }})'
+        path: ${{ env.ARTIFACTS_STAGING_DIR }}

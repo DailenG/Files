@@ -92,7 +92,7 @@ namespace Files.App.Helpers
 			SystemIO.Path.Combine(Package.Current.InstalledLocation.Path, AppEnvironment switch
 			{
 				AppEnvironment.Dev => Constants.AssetPaths.DevLogo,
-				AppEnvironment.SideloadPreview or AppEnvironment.StorePreview => Constants.AssetPaths.PreviewLogo,
+				AppEnvironment.SideloadPreview or AppEnvironment.StorePreview or AppEnvironment.SideloadPoc => Constants.AssetPaths.PreviewLogo,
 				_ => Constants.AssetPaths.StableLogo
 			});
 
