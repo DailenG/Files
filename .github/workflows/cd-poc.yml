@@ -138,7 +138,7 @@ jobs:
     - name: Restore NuGet.Config
       if: always() && steps.signing.outputs.trusted == 'true'
       shell: pwsh
-      run: Move-Item NuGet.Config.bak NuGet.Config
+      run: if (Test-Path NuGet.Config.bak) { Move-Item NuGet.Config.bak NuGet.Config -Force }
 
     - name: Generate a self-signed certificate
       if: steps.signing.outputs.trusted != 'true'
@@ -154,22 +154,25 @@ jobs:
       shell: pwsh
       run: |
         $signArgs = if ($env:PFX_PATH) {
-          @("-p:AppxPackageSigningEnabled=true", "-p:PackageCertificateKeyFile=$env:PFX_PATH")
+          @('-p:AppxPackageSigningEnabled=true', "-p:PackageCertificateKeyFile=$env:PFX_PATH")
         } else {
-          @("-p:AppxPackageSigningEnabled=false")
+          @('-p:AppxPackageSigningEnabled=false')
         }
         foreach ($plat in ("$env:APPX_BUNDLE_PLATFORMS" -split '\|')) {
           Write-Host "Building for $plat..."
-          msbuild "$env:APP_PROJECT_PATH" `
-            -t:Build `
-            -p:Platform=$plat `
-            -p:Configuration=$env:CONFIGURATION `
-            -p:AppxPackageDir="$env:APPX_PACKAGE_DIR" `
-            -p:AppxBundle=Never `
-            -p:GenerateAppxPackageOnBuild=true `
-            -p:UapAppxPackageBuildMode=Sideload `
-            @signArgs `
-            -v:quiet
+          $msbuildArgs = @(
+            "$env:APP_PROJECT_PATH",
+            '-t:Build',
+            "-p:Platform=$plat",
+            "-p:Configuration=$env:CONFIGURATION",
+            "-p:AppxPackageDir=$env:APPX_PACKAGE_DIR",
+            '-p:AppxBundle=Never',
+            '-p:GenerateAppxPackageOnBuild=true',
+            '-p:UapAppxPackageBuildMode=Sideload',
+            '-v:quiet'
+          ) + $signArgs
+          & msbuild @msbuildArgs
+          if ($LASTEXITCODE -ne 0) { throw "msbuild failed for $plat with exit code $LASTEXITCODE" }
         }
 
     - name: Create the msixbundle
@@ -211,7 +214,7 @@ jobs:
     - name: Restore NuGet.Config
       if: always() && steps.signing.outputs.trusted == 'true'
       shell: pwsh
-      run: Move-Item NuGet.Config.bak NuGet.Config
+      run: if (Test-Path NuGet.Config.bak) { Move-Item NuGet.Config.bak NuGet.Config -Force }
 
     - name: Stage the release assets
       shell: pwsh
