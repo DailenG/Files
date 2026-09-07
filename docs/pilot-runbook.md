@@ -26,10 +26,11 @@ Local disks and ordinary SMB shares are untouched in every mode.
 
    ```powershell
    Expand-Archive .\Dependencies.zip -DestinationPath .\Dependencies -Force
-   $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
    Add-AppxPackage -Path .\Files.CloudGuard_<version>_x64_arm64.msixbundle `
-     -DependencyPath ".\Dependencies\$arch\Microsoft.WindowsAppRuntime.2.msix"
+     -DependencyPath .\Dependencies\x64\Microsoft.WindowsAppRuntime.2.msix
    ```
+
+   On an ARM64 machine use `.\Dependencies\ARM64\...` instead.
 
    If the Windows App Runtime 2.4 is already present on the machine, `-DependencyPath` can be omitted entirely.
 
