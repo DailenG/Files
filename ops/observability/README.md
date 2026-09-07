@@ -117,3 +117,4 @@ Export the JSON from the UI after building a panel set; the schema is version sp
 | Certificate errors on the client | `./deploy.sh status` shows no cert: DNS-01 failed. Check token scope, and that `otel.pesengineers.dev` still resolves publicly (the TXT challenge is written to the public zone) |
 | Data appears from an off-site machine | it resolved and reached `192.168.76.42`, so it is on VPN; expected |
 | ClickHouse disk growth | retention in **Settings > General**; the AIO container has no separate TTL knob |
+| `otel-ingress` returns `502` with a valid token; `docker exec signoz-aio clickhouse-client -q 'SHOW DATABASES'` lists no `signoz_*` | First boot was interrupted (e.g. `deploy.sh` re-run during initial migrations) and the collector is stuck in `migrate sync check`. Fix: `rm /mnt/user/appdata/signoz-aio/.telemetrystore-migrations-complete && docker restart signoz-aio`; migrations take 2-3 minutes |
