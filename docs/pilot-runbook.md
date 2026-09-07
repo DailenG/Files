@@ -14,7 +14,7 @@ Local disks and ordinary SMB shares are untouched in every mode.
 
 ## 1. Install
 
-1. Download `Files.CloudGuard_<version>_x64_arm64.msixbundle` and `Dependencies.zip` from the release, then `cd` to wherever they landed. Every command below is relative to that folder; nothing is written outside it.
+1. Download the `.msixbundle` and `Dependencies.zip` from the release, then `cd` to wherever they landed. Every command below is relative to that folder; nothing is written outside it. Builds are x64 only.
 2. If the release includes `FilesCloudGuard.cer`, the build was self-signed and the certificate must be trusted first, from an elevated PowerShell:
 
    ```powershell
@@ -26,11 +26,9 @@ Local disks and ordinary SMB shares are untouched in every mode.
 
    ```powershell
    Expand-Archive .\Dependencies.zip -DestinationPath .\Dependencies -Force
-   Add-AppxPackage -Path .\Files.CloudGuard_<version>_x64_arm64.msixbundle `
+   Add-AppxPackage -Path (Get-ChildItem .\*.msixbundle).FullName `
      -DependencyPath .\Dependencies\x64\Microsoft.WindowsAppRuntime.2.msix
    ```
-
-   On an ARM64 machine use `.\Dependencies\ARM64\...` instead.
 
    If the Windows App Runtime 2.4 is already present on the machine, `-DependencyPath` can be omitted entirely.
 

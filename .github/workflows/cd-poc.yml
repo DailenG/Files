@@ -6,7 +6,7 @@
 #
 # Workflow:
 #  1. Configure the manifest for the POC identity (installs alongside production Files)
-#  2. Restore, build and package for x64 and arm64
+#  2. Restore, build and package for x64
 #  3. Sign with Azure Trusted Signing when configured, otherwise with a generated self-signed certificate
 #  4. Publish the msixbundle, dependencies and pilot documentation to a GitHub release
 
@@ -38,7 +38,7 @@ jobs:
       SOLUTION_NAME:         'Files.slnx'
       CONFIGURATION:         '${{ matrix.configuration }}'
       PLATFORM:              '${{ matrix.platform }}'
-      APPX_BUNDLE_PLATFORMS: 'x64|arm64'
+      APPX_BUNDLE_PLATFORMS: 'x64'
       WORKING_DIR:           '${{ github.workspace }}'
       ARTIFACTS_STAGING_DIR: '${{ github.workspace }}\artifacts'
       APPX_PACKAGE_DIR:      '${{ github.workspace }}\artifacts\AppxPackages\'
