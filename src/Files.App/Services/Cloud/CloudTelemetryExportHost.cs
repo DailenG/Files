@@ -43,12 +43,16 @@ namespace Files.App.Services.Cloud
 			if (_settings.Mode == CloudOptimizationMode.Off || !_settings.TelemetryEnabled)
 				return;
 
-			if (!Uri.TryCreate(_settings.TelemetryEndpoint, UriKind.Absolute, out var endpoint) || !endpoint.IsLoopback)
+			if (!Uri.TryCreate(_settings.TelemetryEndpoint, UriKind.Absolute, out var endpoint) || !IsPermittedEndpoint(endpoint))
 			{
-				// Non-loopback export requires explicit approval; see docs/privacy-and-telemetry.md.
-				_logger.LogWarning("Cloud telemetry export skipped: endpoint is missing or not loopback.");
+				// Plaintext export never leaves the machine; see docs/privacy-and-telemetry.md.
+				_logger.LogWarning("Cloud telemetry export skipped: endpoint is missing, or is neither loopback nor https.");
 				return;
 			}
+
+			// The OTLP/HTTP paths are appended by the SDK only for env-var configured endpoints
+			var baseEndpoint = endpoint.AbsolutePath.EndsWith('/') ? endpoint : new Uri(endpoint, endpoint.AbsolutePath + "/");
+			var token = _settings.TelemetryAuthToken;
 
 			try
 			{
@@ -62,12 +66,15 @@ namespace Files.App.Services.Cloud
 						new("installation.id", _settings.InstallationId),
 					]);
 
-				void ConfigureOtlp(OtlpExporterOptions options)
+				void ConfigureOtlp(OtlpExporterOptions options, string signalPath)
 				{
 					options.Protocol = OtlpExportProtocol.HttpProtobuf;
-					options.Endpoint = endpoint;
+					options.Endpoint = new Uri(baseEndpoint, signalPath);
 					options.TimeoutMilliseconds = ExportTimeoutMs;
-					// The loopback check covers only the configured endpoint; never follow a redirect off it
+					if (!string.IsNullOrEmpty(token))
+						options.Headers = $"Authorization=Bearer {token}";
+
+					// The endpoint check covers only the configured URL; never follow a redirect off it
 					options.HttpClientFactory = () => new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false })
 					{
 						Timeout = TimeSpan.FromMilliseconds(ExportTimeoutMs),
@@ -79,7 +86,7 @@ namespace Files.App.Services.Cloud
 					.AddSource(CloudTelemetryAttributes.ActivitySourceName)
 					.AddOtlpExporter(options =>
 					{
-						ConfigureOtlp(options);
+						ConfigureOtlp(options, "v1/traces");
 						options.ExportProcessorType = ExportProcessorType.Batch;
 						options.BatchExportProcessorOptions.MaxQueueSize = 2_048;
 						options.BatchExportProcessorOptions.ExporterTimeoutMilliseconds = ExportTimeoutMs;
@@ -91,7 +98,7 @@ namespace Files.App.Services.Cloud
 					.AddMeter(CloudTelemetryAttributes.MeterName)
 					.AddOtlpExporter((options, readerOptions) =>
 					{
-						ConfigureOtlp(options);
+						ConfigureOtlp(options, "v1/metrics");
 						readerOptions.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = MetricExportIntervalMs;
 						readerOptions.PeriodicExportingMetricReaderOptions.ExportTimeoutMilliseconds = ExportTimeoutMs;
 					})
@@ -105,6 +112,12 @@ namespace Files.App.Services.Cloud
 				Dispose();
 			}
 		}
+
+		/// <summary>
+		/// Plaintext is allowed only on loopback; anything that crosses a network interface must be TLS.
+		/// </summary>
+		private static bool IsPermittedEndpoint(Uri endpoint)
+			=> endpoint.IsLoopback || endpoint.Scheme == Uri.UriSchemeHttps;
 
 		public void Dispose()
 		{

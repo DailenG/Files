@@ -1,0 +1,36 @@
+{
+	email {$ACME_EMAIL}
+	auto_https disable_redirects
+}
+
+# OTLP/HTTP ingest for Files Cloud Guard. TLS via Let's Encrypt (DNS-01 on Cloudflare),
+# bearer token required, only the two signal paths are exposed. Port 8443 because the
+# Unraid web UI owns 443 on the host.
+{$INGEST_HOST}:8443 {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+		resolvers 1.1.1.1 1.0.0.1
+	}
+
+	@unauthorized not header Authorization "Bearer {env.INGEST_TOKEN}"
+	handle @unauthorized {
+		respond 401
+	}
+
+	@signals path /v1/traces /v1/metrics
+	handle @signals {
+		reverse_proxy signoz-aio:4318 {
+			header_up -Authorization
+		}
+	}
+
+	handle {
+		respond 404
+	}
+
+	log {
+		output stdout
+		format console
+		level WARN
+	}
+}
