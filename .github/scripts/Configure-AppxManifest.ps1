@@ -117,6 +117,32 @@ elseif ($Branch -eq "SideloadStable")
     }
 
 }
+elseif ($Branch -eq "SideloadPoc")
+{
+    # A distinct identity, protocol and alias so the POC installs alongside production Files
+    $xmlDoc.Package.Identity.Name="FilesCloudGuard"
+    $xmlDoc.Package.Properties.DisplayName="Files Cloud Guard (POC)"
+    $xmlDoc.Package.Applications.Application.VisualElements.DisplayName="Files Cloud Guard (POC)"
+    $xmlDoc.Package.Applications.Application.VisualElements.DefaultTile.ShortName="Cloud Guard"
+
+    $ap.SetAttribute("Name", "files-cloudguard");
+    $ea.SetAttribute("Alias", "files-cloudguard.exe");
+
+    $xmlDoc.Save($PackageManifestPath)
+
+    Get-ChildItem $WorkingDir -Include *.csproj, *.appxmanifest, *.xaml -recurse | ForEach-Object -Process `
+    { `
+        (Get-Content $_ -Raw | ForEach-Object -Process { $_ -replace "Assets\\AppTiles\\Dev", "Assets\AppTiles\Preview" }) | `
+        Set-Content $_ -NoNewline `
+    }
+
+    Get-ChildItem $WorkingDir -Include *.cs, *.cpp -recurse | ForEach-Object -Process `
+    { `
+        (Get-Content $_ -Raw | ForEach-Object -Process { $_ -replace "files-dev", "files-cloudguard" }) | `
+        Set-Content $_ -NoNewline `
+    }
+
+}
 elseif ($Branch -eq "StoreStable")
 {
     # Set identities
@@ -151,7 +177,7 @@ elseif ($Branch -eq "StoreStable")
 }
 
 # Remove unused tile assets so they don't end up in the package
-$keepTiles = if ($Branch -match 'Preview') { 'Preview' } elseif ($Branch -match 'Stable') { 'Release' } else { $null }
+$keepTiles = if ($Branch -match 'Preview' -or $Branch -eq 'SideloadPoc') { 'Preview' } elseif ($Branch -match 'Stable') { 'Release' } else { $null }
 foreach ($folder in @('Dev', 'Preview', 'Release')) {
     if ($folder -eq $keepTiles) { continue }
     $tilePath = Join-Path $WorkingDir "src\Files.App\Assets\AppTiles\$folder"
