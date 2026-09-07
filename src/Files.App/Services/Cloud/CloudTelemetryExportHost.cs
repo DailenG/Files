@@ -8,6 +8,7 @@ using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using System.Net.Http;
 
 namespace Files.App.Services.Cloud
 {
@@ -66,6 +67,11 @@ namespace Files.App.Services.Cloud
 					options.Protocol = OtlpExportProtocol.HttpProtobuf;
 					options.Endpoint = endpoint;
 					options.TimeoutMilliseconds = ExportTimeoutMs;
+					// The loopback check covers only the configured endpoint; never follow a redirect off it
+					options.HttpClientFactory = () => new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false })
+					{
+						Timeout = TimeSpan.FromMilliseconds(ExportTimeoutMs),
+					};
 				}
 
 				_tracerProvider = Sdk.CreateTracerProviderBuilder()

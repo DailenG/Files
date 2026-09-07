@@ -11,7 +11,8 @@ namespace Files.App.Services.Settings
 		private const string DefaultTelemetryEndpoint = "http://localhost:4318";
 
 		private static readonly CloudOptimizationMode? EnvironmentModeOverride =
-			Enum.TryParse<CloudOptimizationMode>(Environment.GetEnvironmentVariable(ModeEnvironmentVariable), ignoreCase: true, out var mode) ? mode : null;
+			Enum.TryParse<CloudOptimizationMode>(Environment.GetEnvironmentVariable(ModeEnvironmentVariable), ignoreCase: true, out var mode)
+			&& Enum.IsDefined(mode) ? mode : null;
 
 		public CloudOptimizationSettingsService(ISettingsSharingContext settingsSharingContext)
 		{

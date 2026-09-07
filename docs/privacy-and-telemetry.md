@@ -51,7 +51,7 @@ Settings live in the Files `user_settings.json` file under `%LOCALAPPDATA%\Packa
 |---|---|---|
 | `Mode` | `Off` | `Off`, `Observe`, or `Protect` |
 | `TelemetryEnabled` | `false` | Export to the collector. Opt-in. No effect when `Mode` is `Off` |
-| `TelemetryEndpoint` | `http://localhost:4318` | OTLP/HTTP endpoint. Non-loopback endpoints are refused by the export host |
+| `TelemetryEndpoint` | `http://localhost:4318` | OTLP/HTTP endpoint. Non-loopback endpoints are refused by the export host and HTTP redirects are never followed |
 | `EgnyteConfiguredRoots` | `[]` | Administrator override roots treated as Egnyte; empty means automatic detection |
 | `InstallationId` | generated | Random identifier; delete the key to rotate it |
 
@@ -60,7 +60,7 @@ The environment variable `FILES_CLOUD_GUARD_MODE` (`Off`/`Observe`/`Protect`) ov
 1. **Operating Modes**:
    - `Off`: No spans or measurements are created. The exporter is not started.
    - `Observe`: Stock Files behavior; cloud-backed interactions are recorded.
-   - `Protect`: Protections active; interactions and policy decisions are recorded.
+   - `Protect`: Interactions and policy decisions are recorded. Enforcement is not implemented yet; behavior currently matches `Observe`.
 2. **What is recorded**: only operations whose location classifies as cloud-backed (`IsCloudBacked`). Local disks and standard network shares produce no telemetry.
 3. **Collector Unavailability**: recording uses bounded in-memory batching (queue 2048 spans, 2 s export timeout, 10 s metric interval). An unreachable collector drops data silently; the UI and file operations are never blocked.
 4. **Failure isolation**: telemetry recording errors are swallowed and logged at most five times per process as a warning that contains only the exception type name.
@@ -76,3 +76,4 @@ The environment variable `FILES_CLOUD_GUARD_MODE` (`Off`/`Observe`/`Protect`) ov
 - Only Files-owned activity is observed. Windows Search, Defender, EDR, DLP, backup agents, Office recent-file handlers, Explorer, and other applications are invisible to this telemetry.
 - Mode changes apply to recording immediately, but export start/stop is evaluated at launch; restart Files after changing `TelemetryEnabled` or `TelemetryEndpoint`.
 - Path-correlation tokens (HMAC of normalized paths) are not implemented in the POC.
+- Export to the loopback collector is plaintext OTLP/HTTP without collector authentication. Any process running as the same user can listen on the configured port; enable `TelemetryEnabled` only on machines where the local collector (#5) is trusted. Authenticated transport is deferred until the collector defines certificate provisioning.

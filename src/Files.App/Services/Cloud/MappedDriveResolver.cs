@@ -18,7 +18,15 @@ namespace Files.App.Services.Cloud
 			Span<char> remoteName = stackalloc char[300];
 			uint length = (uint)remoteName.Length;
 
-			return PInvoke.WNetGetConnection(driveLetter, remoteName, ref length) == WIN32_ERROR.NO_ERROR
+			var result = PInvoke.WNetGetConnection(driveLetter, remoteName, ref length);
+			if (result == WIN32_ERROR.ERROR_MORE_DATA)
+			{
+				// length now holds the required size in characters, including the terminator
+				remoteName = new char[length];
+				result = PInvoke.WNetGetConnection(driveLetter, remoteName, ref length);
+			}
+
+			return result == WIN32_ERROR.NO_ERROR
 				? remoteName[..(int)length].TrimEnd('\0').ToString()
 				: null;
 		}

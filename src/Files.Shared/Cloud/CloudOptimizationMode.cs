@@ -19,7 +19,8 @@ namespace Files.Shared.Cloud
 		Observe,
 
 		/// <summary>
-		/// Provider-aware protections active; interactions and policy decisions are recorded.
+		/// Interactions and policy decisions are recorded. Enforcement of provider-aware
+		/// protections is not implemented yet; behavior matches <see cref="Observe"/> until it lands.
 		/// </summary>
 		Protect
 	}

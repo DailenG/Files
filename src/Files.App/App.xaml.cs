@@ -306,9 +306,6 @@ namespace Files.App
 			// Persist the final active stretch; it is reported on the next launch
 			ActiveSessionTracker.OnActivationChanged(false);
 
-			// Flush and stop cloud telemetry export
-			Ioc.Default.GetRequiredService<Services.Cloud.CloudTelemetryExportHost>().Dispose();
-
 			// Save the current tab list in case it was overwriten by another instance
 			if (userSettingsService.GeneralSettingsService.ContinueLastSessionOnStartUp || userSettingsService.AppSettingsService.RestoreTabsOnStartup)
 				AppLifecycleHelper.SaveSessionTabs();
@@ -411,6 +408,9 @@ namespace Files.App
 					}
 				}
 			}
+
+			// Flush and stop cloud telemetry export; the parked (LeaveAppRunning) path keeps exporting
+			Ioc.Default.GetRequiredService<Services.Cloud.CloudTelemetryExportHost>().Dispose();
 
 			// Stop the tray icon's hidden window before continuing teardown so a late "Quit"
 			// click can't dispatch into OnQuitClicked once Application.Current is null.
