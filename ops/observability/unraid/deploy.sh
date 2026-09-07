@@ -57,6 +57,7 @@ docker run -d --name signoz-aio \
 	--restart unless-stopped \
 	-p 8080:8080 \
 	-v "$SIGNOZ_DIR:/appdata" \
+	-v "$SIGNOZ_DIR/clickhouse:/var/lib/clickhouse" \
 	-e TZ=America/New_York \
 	-e SIGNOZ_GLOBAL_INGESTION__URL="https://$(grep ^INGEST_HOST= "$INGRESS_DIR/.env" | cut -d= -f2):8443" \
 	-e SIGNOZ_ANALYTICS_ENABLED=false \

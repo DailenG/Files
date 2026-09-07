@@ -33,6 +33,11 @@
       <ContainerDir>/appdata</ContainerDir>
       <Mode>rw</Mode>
     </Volume>
+    <Volume>
+      <HostDir>/mnt/user/appdata/signoz-aio/clickhouse</HostDir>
+      <ContainerDir>/var/lib/clickhouse</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
   </Data>
   <Environment>
     <Variable>
@@ -54,6 +59,7 @@
   </Environment>
   <Config Name="SigNoz UI Port" Target="8080" Default="8080" Mode="tcp" Description="SigNoz UI and API. LAN only." Type="Port" Display="always" Required="true" Mask="false">8080</Config>
   <Config Name="AppData - SigNoz Root" Target="/appdata" Default="/mnt/user/appdata/signoz-aio" Mode="rw" Description="ClickHouse data, ZooKeeper state, generated config, SigNoz SQLite metadata." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/signoz-aio</Config>
+  <Config Name="AppData - ClickHouse" Target="/var/lib/clickhouse" Default="/mnt/user/appdata/signoz-aio/clickhouse" Mode="rw" Description="Telemetry database. The image declares this as an anonymous VOLUME and does not write under /appdata despite upstream docs; bind it explicitly or data is orphaned on container recreate." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/signoz-aio/clickhouse</Config>
   <Config Name="Timezone" Target="TZ" Default="America/New_York" Mode="" Description="Container timezone." Type="Variable" Display="always" Required="false" Mask="false">America/New_York</Config>
   <Config Name="Ingestion URL" Target="SIGNOZ_GLOBAL_INGESTION__URL" Default="https://otel.pesengineers.dev:8443" Mode="" Description="Public ingest URL advertised in the UI; served by otel-ingress." Type="Variable" Display="always" Required="false" Mask="false">https://otel.pesengineers.dev:8443</Config>
   <Config Name="Analytics Enabled" Target="SIGNOZ_ANALYTICS_ENABLED" Default="false" Mode="" Description="Upstream Segment analytics. Keep off." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>

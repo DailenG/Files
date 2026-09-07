@@ -15,7 +15,9 @@ Line of sight is the access control: `otel.pesengineers.dev` is a public A recor
 |---|---|
 | Deploy script, Caddyfile, dockerMan templates | `unraid/` in this directory; copied to `/mnt/user/appdata/otel-ingress/deploy/` on the host |
 | Secrets | `/mnt/user/appdata/otel-ingress/.env` on the host only (`chmod 600`); never in the repository |
-| SigNoz data | `/mnt/user/appdata/signoz-aio/` (ClickHouse, ZooKeeper, SQLite metadata) |
+| SigNoz metadata (users, org, dashboards, settings) | `/mnt/user/appdata/signoz-aio/signoz/signoz.db` (SQLite, bind mount) |
+| Telemetry data | `/mnt/user/appdata/signoz-aio/clickhouse/` bound to `/var/lib/clickhouse`. The image declares that path as an anonymous `VOLUME` and ignores `/appdata/clickhouse` despite the upstream README; without the explicit bind, `docker rm` on update orphans all telemetry |
+| ZooKeeper state, generated config | `/mnt/user/appdata/signoz-aio/{zookeeper,config}/` |
 | Certificates | `/mnt/user/appdata/otel-ingress/data/caddy/` |
 | Docker network | `otel-net`; OTLP ports 4317/4318 are not published on the host |
 | Host ports | `8080` SigNoz UI (LAN), `8443` HTTPS ingest. `443` belongs to the Unraid web UI |
@@ -58,7 +60,7 @@ Already present in the `pesengineers.dev` zone: `A otel 192.168.76.42`, DNS only
 ## 5. SigNoz first run
 
 1. Open `http://pes-dev.pes.local:8080` on the LAN, create the admin account.
-2. **Settings > General**: retention traces 7 days, metrics 30 days. These values are quoted in `docs/privacy-and-telemetry.md`; change both together.
+2. **Settings > General**: retention metrics 3 months, traces 1 month, logs 1 month (projects get shelved for weeks at a time; nothing here is sensitive enough to need shorter). These values are quoted in `docs/privacy-and-telemetry.md`; change both together.
 3. Upstream analytics and stats reporting are disabled by the template.
 
 ## 6. Windows pilot configuration

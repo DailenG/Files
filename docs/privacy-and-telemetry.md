@@ -68,7 +68,7 @@ The environment variable `FILES_CLOUD_GUARD_MODE` (`Off`/`Observe`/`Protect`) ov
 
 ## Retention and Deletion
 
-- Files itself retains no telemetry. Data exists only in the internal SigNoz instance described in `ops/observability/README.md` (see #5); retention is enforced there (traces 7 days, metrics 30 days) and deleting its volumes deletes all telemetry.
+- Files itself retains no telemetry. Data exists only in the internal SigNoz instance described in `ops/observability/README.md` (see #5); retention is enforced there (traces 1 month, metrics 3 months) and deleting `/mnt/user/appdata/signoz-aio/clickhouse` deletes all telemetry.
 - Application logs (`debug.log`) may contain the warning described above but never telemetry payloads.
 - To disable completely: set `Mode` to `Off` (or `TelemetryEnabled` to `false`) and restart Files. To rotate the installation identifier, remove `InstallationId` from `user_settings.json`.
 
