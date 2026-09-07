@@ -20,7 +20,7 @@ The POC needs evidence about Files-owned interactions with cloud-backed location
 
 5. **Never block, never throw.** Recording is wrapped in try/catch with a rate-limited warning (max 5 per process). Export uses the SDK batch processor (bounded queue 2048, 2 s export timeout, 10 s metric interval). An unreachable collector drops batches silently.
 
-6. **Loopback-only export by default.** The export host refuses non-loopback endpoints. Shared collectors require an explicit code change and approval per `docs/privacy-and-telemetry.md`.
+6. **Direct export, TLS off-box.** The export host accepts plaintext only for loopback endpoints (development against a local collector); any remote endpoint must be `https`, and an optional bearer token from the credential vault is attached. No local collector agent is shipped: it would only relocate the same HTTPS client into a second signed process, add an install/uninstall surface, and (with a disk queue) carry data out of the building to flush later. Retry is in-memory only, so unreachable-network periods export nothing. See #5 for the collector side.
 
 7. **Identity.** Resource attributes are `service.name=files-cloud-guard`, `app.version`, `session.id` (per process), and `installation.id` (random GUID persisted in settings). No machine name, user, or SID.
 

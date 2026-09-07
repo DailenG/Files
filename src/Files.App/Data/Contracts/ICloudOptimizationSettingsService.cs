@@ -21,9 +21,15 @@ namespace Files.App.Data.Contracts
 		bool TelemetryEnabled { get; set; }
 
 		/// <summary>
-		/// Gets or sets the OTLP/HTTP endpoint telemetry is exported to.
+		/// Gets or sets the OTLP/HTTP base endpoint telemetry is exported to. Plaintext http is accepted only for loopback; remote endpoints must be https.
 		/// </summary>
 		string TelemetryEndpoint { get; set; }
+
+		/// <summary>
+		/// Gets or sets the bearer token sent with every export request. Stored in the Windows credential vault, not in user_settings.json.
+		/// The FILES_CLOUD_GUARD_TOKEN environment variable overrides this value for the process lifetime. Empty means no Authorization header.
+		/// </summary>
+		string TelemetryAuthToken { get; set; }
 
 		/// <summary>
 		/// Gets or sets administrator-configured roots (drive letters or UNC roots) to treat as Egnyte. Empty means automatic detection only.
