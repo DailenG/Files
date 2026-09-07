@@ -3,11 +3,13 @@
 
 using Files.App.UserControls.FilePreviews;
 using Files.App.ViewModels.Previews;
+using Files.Shared.Cloud;
 using Files.Shared.Helpers;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System.Collections.Specialized;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Windows.Storage;
 using WinRT;
@@ -19,6 +21,8 @@ namespace Files.App.ViewModels.UserControls
 		private IInfoPaneSettingsService infoPaneSettingsService { get; } = Ioc.Default.GetRequiredService<IInfoPaneSettingsService>();
 		private IContentPageContext contentPageContext { get; } = Ioc.Default.GetRequiredService<IContentPageContext>();
 		private DrivesViewModel drivesViewModel { get; } = Ioc.Default.GetRequiredService<DrivesViewModel>();
+		private ICloudLocationClassifier cloudLocationClassifier { get; } = Ioc.Default.GetRequiredService<ICloudLocationClassifier>();
+		private ICloudInteractionTelemetry cloudTelemetry { get; } = Ioc.Default.GetRequiredService<ICloudInteractionTelemetry>();
 
 		private CancellationTokenSource? loadCancellationTokenSource;
 		private Files.App.UserControls.Menus.FileTagsContextMenu? cachedTagsContextMenu;
@@ -222,7 +226,40 @@ namespace Files.App.ViewModels.UserControls
 				return;
 			}
 
-			var control = await GetBuiltInPreviewControlAsync(item, downloadItem);
+			var cloudOperation = await ClassifyPreviewRequestAsync(item, downloadItem, token);
+			if (cloudOperation is not null
+				&& !downloadItem
+				&& cloudTelemetry.Mode == CloudOptimizationMode.Protect
+				&& cloudOperation.Location.HasHydrationRisk
+				&& item.PrimaryItemAttribute == StorageItemTypes.File)
+			{
+				// Protect: never read content on selection. The card binds only to enumeration metadata; the button re-enters with downloadItem=true.
+				cloudTelemetry.RecordDecision(new(cloudOperation, CloudPolicyDecisionKind.Deferred));
+				cloudTelemetry.RecordResult(new(cloudOperation, CloudOperationOutcome.Success, TimeSpan.Zero, Preview: CloudPreviewResult.Deferred));
+
+				ShowCloudItemButton = true;
+				PreviewPaneContent = new DeferredPreview(item, () => _ = UpdateSelectedItemPreviewAsync(downloadItem: true));
+				PreviewPaneState = PreviewPaneStates.PreviewAndDetailsAvailable;
+				return;
+			}
+
+			var started = Stopwatch.GetTimestamp();
+			UserControl? control;
+			try
+			{
+				control = await GetBuiltInPreviewControlAsync(item, downloadItem);
+			}
+			catch when (cloudOperation is not null && !token.IsCancellationRequested)
+			{
+				cloudTelemetry.RecordResult(new(cloudOperation, CloudOperationOutcome.Failure, Stopwatch.GetElapsedTime(started), Preview: PreviewResultFor(downloadItem), Error: CloudErrorCategory.Unknown));
+				throw;
+			}
+
+			if (cloudOperation is not null)
+			{
+				cloudTelemetry.RecordDecision(new(cloudOperation, downloadItem ? CloudPolicyDecisionKind.Allowed : CloudPolicyDecisionKind.Observed));
+				cloudTelemetry.RecordResult(new(cloudOperation, token.IsCancellationRequested ? CloudOperationOutcome.Cancelled : CloudOperationOutcome.Success, Stopwatch.GetElapsedTime(started), Preview: token.IsCancellationRequested ? CloudPreviewResult.Cancelled : PreviewResultFor(downloadItem)));
+			}
 
 			if (token.IsCancellationRequested)
 				return;
@@ -245,6 +282,38 @@ namespace Files.App.ViewModels.UserControls
 			PreviewPaneContent = control;
 			PreviewPaneState = SelectedDriveItem is not null ? PreviewPaneStates.DriveStorageDetailsAvailable : PreviewPaneStates.PreviewAndDetailsAvailable;
 		}
+
+		/// <summary>
+		/// Describes a preview request for telemetry when the item lives on a cloud-backed location; null for local items or when the mode is Off.
+		/// </summary>
+		private async ValueTask<CloudInteractionOperation?> ClassifyPreviewRequestAsync(ListedItem item, bool isExplicit, CancellationToken token)
+		{
+			if (cloudTelemetry.Mode == CloudOptimizationMode.Off || item.ItemPath is null)
+				return null;
+
+			try
+			{
+				var location = await cloudLocationClassifier.ClassifyAsync(item.ItemPath, token);
+				if (!location.IsCloudBacked)
+					return null;
+
+				return new(
+					CloudOperationName.RequestPreview,
+					isExplicit ? CloudAccessOrigin.ExplicitButton : CloudAccessOrigin.SelectionChanged,
+					location,
+					IsExplicit: isExplicit,
+					FileSize: item.PrimaryItemAttribute == StorageItemTypes.File ? item.FileSizeBytes : null,
+					Extension: item.FileExtension);
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				App.Logger.LogDebug(ex, "Cloud location classification failed for a preview request.");
+				return null;
+			}
+		}
+
+		private static CloudPreviewResult PreviewResultFor(bool downloadItem)
+			=> downloadItem ? CloudPreviewResult.ExplicitLoad : CloudPreviewResult.DirectLoad;
 
 		private async Task<UserControl?> GetBuiltInPreviewControlAsync(ListedItem item, bool downloadItem)
 		{

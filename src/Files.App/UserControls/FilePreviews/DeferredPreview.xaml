@@ -1,0 +1,63 @@
+<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
+<UserControl
+	x:Class="Files.App.UserControls.FilePreviews.DeferredPreview"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:helpers="using:Files.App.Helpers"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	d:DesignHeight="300"
+	d:DesignWidth="400"
+	mc:Ignorable="d">
+
+	<StackPanel
+		MaxWidth="320"
+		HorizontalAlignment="Center"
+		VerticalAlignment="Center"
+		Spacing="12">
+
+		<Image
+			Width="96"
+			Height="96"
+			HorizontalAlignment="Center"
+			Source="{x:Bind Item.FileImage, Mode=OneWay}"
+			Stretch="Uniform" />
+
+		<TextBlock
+			HorizontalAlignment="Center"
+			IsTextSelectionEnabled="True"
+			Style="{ThemeResource BodyStrongTextBlockStyle}"
+			Text="{x:Bind Item.Name, Mode=OneWay}"
+			TextAlignment="Center"
+			TextTrimming="CharacterEllipsis"
+			TextWrapping="Wrap" />
+
+		<TextBlock
+			HorizontalAlignment="Center"
+			Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+			Style="{ThemeResource CaptionTextBlockStyle}"
+			TextAlignment="Center"
+			TextWrapping="Wrap">
+			<Run Text="{x:Bind Item.ItemType, Mode=OneWay}" />
+			<Run Text="&#x2022;" />
+			<Run Text="{x:Bind Item.FileSize, Mode=OneWay}" />
+			<Run Text="&#x2022;" />
+			<Run Text="{x:Bind Item.ItemDateModified, Mode=OneWay}" />
+		</TextBlock>
+
+		<TextBlock
+			HorizontalAlignment="Center"
+			Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+			Style="{ThemeResource CaptionTextBlockStyle}"
+			Text="{helpers:ResourceString Name=PreviewPaneDeferredCloudPreviewText}"
+			TextAlignment="Center"
+			TextWrapping="Wrap" />
+
+		<Button
+			HorizontalAlignment="Center"
+			Click="LoadPreview_Click"
+			Content="{helpers:ResourceString Name=PreviewPaneLoadCloudItemButton/Text}"
+			Style="{ThemeResource AccentButtonStyle}"
+			ToolTipService.ToolTip="{helpers:ResourceString Name=PreviewPaneLoadCloudItemButton/ToolTipService/ToolTip}" />
+	</StackPanel>
+</UserControl>

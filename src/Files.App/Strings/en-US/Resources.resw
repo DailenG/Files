@@ -1709,6 +1709,9 @@
   <data name="PreviewPaneLoadCloudItemButton.ToolTipService.ToolTip" xml:space="preserve">
     <value>Downloads the item from the cloud and loads the preview</value>
   </data>
+  <data name="PreviewPaneDeferredCloudPreviewText" xml:space="preserve">
+    <value>Preview is paused for cloud files to avoid downloading them</value>
+  </data>
   <data name="DetailsArchiveItems" xml:space="preserve">
     <value>{0, plural, one {# item} other {# items}} ({1, plural, one {# file} other {# files}}, {2, plural, one {# folder} other {# folders}})</value>
   </data>
