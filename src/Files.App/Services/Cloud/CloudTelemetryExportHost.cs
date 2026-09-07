@@ -99,6 +99,8 @@ namespace Files.App.Services.Cloud
 					.AddOtlpExporter((options, readerOptions) =>
 					{
 						ConfigureOtlp(options, "v1/metrics");
+						// SigNoz stores histograms per interval; cumulative buckets make percentile queries fail server-side
+						readerOptions.TemporalityPreference = MetricReaderTemporalityPreference.Delta;
 						readerOptions.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = MetricExportIntervalMs;
 						readerOptions.PeriodicExportingMetricReaderOptions.ExportTimeoutMilliseconds = ExportTimeoutMs;
 					})
