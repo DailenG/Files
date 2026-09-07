@@ -22,11 +22,13 @@ Local disks and ordinary SMB shares are untouched in every mode.
    ```
 
    Releases signed with Azure Trusted Signing have no `.cer` and need no such step.
-3. Expand `Dependencies.zip`, then install:
+3. Expand `Dependencies.zip`, then install. The archive carries both architectures, and passing all of them fails with `0x80073D10 ... wrong processor architecture`, so select the one this machine uses:
 
    ```powershell
+   Expand-Archive .\Dependencies.zip -DestinationPath .\Dependencies -Force
+   $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'ARM64' } else { 'x64' }
    Add-AppxPackage -Path .\Files.CloudGuard_<version>_x64_arm64.msixbundle `
-     -DependencyPath (Get-ChildItem .\Dependencies -Recurse -Include *.appx, *.msix | ForEach-Object FullName)
+     -DependencyPath (Get-ChildItem ".\Dependencies\$arch" -Recurse -Include *.appx, *.msix | ForEach-Object FullName)
    ```
 
 4. Launch **Files Cloud Guard (POC)** from Start once, then close it. This creates its settings folder.
