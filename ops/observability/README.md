@@ -98,16 +98,28 @@ Then browse a cloud-backed location in Files (Observe mode) and open SigNoz **Se
 
 ## 8. Dashboards
 
-`dashboards/` holds SigNoz dashboard exports. Import through **Dashboards > New Dashboard > Import JSON**. Panels compare Observe vs Protect through a `mode` variable:
+`dashboards/cloud-guard-observe-vs-protect.json` is the Observe-vs-Protect comparison dashboard (SigNoz dashboard schema `v6`). It is already installed on `pes-dev`; re-import after a rebuild through **Dashboards > New Dashboard > Import JSON**, or reinstall it directly:
 
-- operations per minute by `provider` and `operation`
-- p50 / p95 of `files.cloud.operation.duration`
-- `files.cloud.policy.decisions` by `decision`
-- thumbnail `cache_hits` / `cache_misses` / `generic_fallbacks` ratio
-- preview `deferred` vs `explicit_loads`
-- `files.cloud.failures` by `error_category`
+```bash
+scp ops/observability/dashboards/cloud-guard-observe-vs-protect.json root@pes-dev.pes.local:/tmp/d.json
+ssh root@pes-dev.pes.local "D=/mnt/user/appdata/signoz-aio/signoz/signoz.db; \
+  sqlite3 \$D \"UPDATE dashboard SET data = readfile('/tmp/d.json'), updated_at = datetime('now') \
+  WHERE name = 'Files Cloud Guard: Observe vs Protect'\"; rm /tmp/d.json"
+```
 
-Export the JSON from the UI after building a panel set; the schema is version specific, so exports are checked in rather than hand-written.
+Two variables drive every panel: `mode` (multi-select over `optimization.mode`) and `provider` (defaults to `egnyte`). Panels:
+
+| Panel | Reads |
+|---|---|
+| Hydrating background thumbnail requests | `files.cloud.operations` filtered to `access.origin = 'background'`, split by mode. This is the number Protect must hold at zero |
+| Thumbnail outcomes | `thumbnail.cache_hits` / `cache_misses` / `generic_fallbacks` by mode |
+| Preview loads | `preview.deferred`, `preview.explicit_loads`, and operations with `preview.result = 'direct_load'` |
+| Policy decisions | `files.cloud.policy.decisions` by `policy.decision` and mode |
+| Operations by type and origin | `files.cloud.operations` by `operation.name` and `access.origin` |
+| Operation duration p95 | `files.cloud.operation.duration` by `operation.name` and mode |
+| Three totals | background requests, generic fallbacks, failures |
+
+The schema is version specific. After editing panels in the UI, export the JSON and replace the file here rather than hand-editing it.
 
 ## Troubleshooting
 
