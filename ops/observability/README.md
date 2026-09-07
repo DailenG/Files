@@ -98,16 +98,28 @@ Then browse a cloud-backed location in Files (Observe mode) and open SigNoz **Se
 
 ## 8. Dashboards
 
-`dashboards/` holds SigNoz dashboard exports. Import through **Dashboards > New Dashboard > Import JSON**. Panels compare Observe vs Protect through a `mode` variable:
+`dashboards/cloud-guard-observe-vs-protect.json` is the Observe-vs-Protect comparison dashboard (SigNoz dashboard schema `v6`). It is already installed on `pes-dev`; re-import after a rebuild through **Dashboards > New Dashboard > Import JSON**, or reinstall it directly:
 
-- operations per minute by `provider` and `operation`
-- p50 / p95 of `files.cloud.operation.duration`
-- `files.cloud.policy.decisions` by `decision`
-- thumbnail `cache_hits` / `cache_misses` / `generic_fallbacks` ratio
-- preview `deferred` vs `explicit_loads`
-- `files.cloud.failures` by `error_category`
+```bash
+scp ops/observability/dashboards/cloud-guard-observe-vs-protect.json root@pes-dev.pes.local:/tmp/d.json
+ssh root@pes-dev.pes.local "D=/mnt/user/appdata/signoz-aio/signoz/signoz.db; \
+  sqlite3 \$D \"UPDATE dashboard SET data = readfile('/tmp/d.json'), updated_at = datetime('now') \
+  WHERE name = 'Files Cloud Guard: Observe vs Protect'\"; rm /tmp/d.json"
+```
 
-Export the JSON from the UI after building a panel set; the schema is version specific, so exports are checked in rather than hand-written.
+Two variables drive every panel: `mode` (multi-select over `optimization.mode`) and `provider` (defaults to `egnyte`). Panels:
+
+| Panel | Reads |
+|---|---|
+| Hydrating background thumbnail requests | `files.cloud.operations` filtered to `access.origin = 'background'`, split by mode. This is the number Protect must hold at zero |
+| Thumbnail outcomes | `thumbnail.cache_hits` / `cache_misses` / `generic_fallbacks` by mode |
+| Preview loads | `preview.deferred`, `preview.explicit_loads`, and operations with `preview.result = 'direct_load'` |
+| Policy decisions | `files.cloud.policy.decisions` by `policy.decision` and mode |
+| Operations by type and origin | `files.cloud.operations` by `operation.name` and `access.origin` |
+| Operation duration p95 | `files.cloud.operation.duration` by `operation.name` and mode |
+| Three totals | background requests, generic fallbacks, failures |
+
+The schema is version specific. After editing panels in the UI, export the JSON and replace the file here rather than hand-editing it.
 
 ## Troubleshooting
 
@@ -120,3 +132,4 @@ Export the JSON from the UI after building a panel set; the schema is version sp
 | Data appears from an off-site machine | it resolved and reached `192.168.76.42`, so it is on VPN; expected |
 | ClickHouse disk growth | retention in **Settings > General**; the AIO container has no separate TTL knob |
 | `otel-ingress` returns `502` with a valid token; `docker exec signoz-aio clickhouse-client -q 'SHOW DATABASES'` lists no `signoz_*` | First boot was interrupted (e.g. `deploy.sh` re-run during initial migrations) and the collector is stuck in `migrate sync check`. Fix: `rm /mnt/user/appdata/signoz-aio/.telemetrystore-migrations-complete && docker restart signoz-aio`; migrations take 2-3 minutes |
+| A percentile panel shows a red error; ClickHouse logs `Function with name histogramQuantile does not exist` | The image's UDF descriptor is misnamed (`custom-function.xml`, but ClickHouse only loads `*_function.*ml`) and wrapped in a `<clickhouse>` root the executable-function loader rejects, so the function never registers. `deploy.sh` reinstalls it after every container start; re-run it, or apply by hand: `docker exec signoz-aio sh -c "sed -e '/<clickhouse>/d' -e '/<\/clickhouse>/d' /opt/signoz-aio/config/clickhouse/custom-function.xml > /etc/clickhouse-server/signoz_function.xml"`. It lives in the container's `/etc`, so a `docker rm` loses it |

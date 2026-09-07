@@ -67,6 +67,26 @@ docker run -d --name signoz-aio \
 	--label net.unraid.docker.icon='https://raw.githubusercontent.com/JSONbored/awesome-unraid/main/icons/signoz.png' \
 	"$SIGNOZ_IMAGE"
 
+# The image ships the histogramQuantile UDF binary and an XML descriptor, but names the descriptor
+# 'custom-function.xml' while ClickHouse only loads files matching '*_function.*ml', and wraps it in
+# a <clickhouse> root the executable-function loader rejects. Without this, every percentile query
+# fails with "Function with name `histogramQuantile` does not exist".
+install_histogram_udf() {
+	for _ in $(seq 1 30); do
+		if docker exec signoz-aio clickhouse-client -q 'SELECT 1' >/dev/null 2>&1; then
+			docker exec signoz-aio sh -c "sed -e '/<clickhouse>/d' -e '/<\/clickhouse>/d' \
+				/opt/signoz-aio/config/clickhouse/custom-function.xml > /etc/clickhouse-server/signoz_function.xml"
+			sleep 8
+			docker exec signoz-aio clickhouse-client -q \
+				"SELECT if(count() = 1, 'histogramQuantile registered', 'histogramQuantile MISSING') FROM system.functions WHERE name = 'histogramQuantile'"
+			return
+		fi
+		sleep 10
+	done
+	echo "ClickHouse never became reachable; histogramQuantile UDF not installed."
+}
+install_histogram_udf
+
 if grep -q '^CF_API_TOKEN=CHANGE_ME' "$INGRESS_DIR/.env"; then
 	echo "CF_API_TOKEN is still CHANGE_ME in $INGRESS_DIR/.env; otel-ingress not started. Set it and re-run."
 	sleep 5
