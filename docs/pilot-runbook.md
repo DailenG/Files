@@ -14,7 +14,7 @@ Local disks and ordinary SMB shares are untouched in every mode.
 
 ## 1. Install
 
-1. Download `Files.CloudGuard_<version>_x64_arm64.msixbundle` and `Dependencies.zip` from the release.
+1. Download `Files.CloudGuard_<version>_x64_arm64.msixbundle` and `Dependencies.zip` from the release, then `cd` to wherever they landed. Every command below is relative to that folder; nothing is written outside it.
 2. If the release includes `FilesCloudGuard.cer`, the build was self-signed and the certificate must be trusted first, from an elevated PowerShell:
 
    ```powershell
