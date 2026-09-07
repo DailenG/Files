@@ -761,7 +761,7 @@
               "aggregations": [
                 {
                   "metricName": "files.cloud.operation.duration.bucket",
-                  "temporality": "Cumulative",
+                  "temporality": "Delta",
                   "timeAggregation": "rate",
                   "spaceAggregation": "p95",
                   "reduceTo": "avg"
