@@ -113,6 +113,33 @@ jobs:
         -p:Configuration=$env:CONFIGURATION `
         -v:quiet
 
+    - name: Hide NuGet.Config from the signing action
+      if: steps.signing.outputs.trusted == 'true'
+      shell: pwsh
+      run: Move-Item NuGet.Config NuGet.Config.bak
+
+    - name: Sign the launcher EXE with Azure Trusted Signing
+      if: steps.signing.outputs.trusted == 'true'
+      uses: Azure/artifact-signing-action@v1
+      with:
+        azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+        endpoint: https://eus.codesigning.azure.net/
+        signing-account-name: ${{ secrets.SIGNING_ACCOUNT_NAME }}
+        certificate-profile-name: ${{ secrets.SIGNING_PROFILE_NAME }}
+        files-folder: ${{ github.workspace }}\src\Files.App\Assets\FilesOpenDialog
+        files-folder-filter: "*.exe"
+        files-folder-recurse: false
+        file-digest: SHA256
+        timestamp-rfc3161: http://timestamp.acs.microsoft.com
+        timestamp-digest: SHA256
+
+    - name: Restore NuGet.Config
+      if: always() && steps.signing.outputs.trusted == 'true'
+      shell: pwsh
+      run: Move-Item NuGet.Config.bak NuGet.Config
+
     - name: Generate a self-signed certificate
       if: steps.signing.outputs.trusted != 'true'
       shell: pwsh
