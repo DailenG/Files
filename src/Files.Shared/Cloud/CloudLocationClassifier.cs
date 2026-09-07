@@ -70,27 +70,25 @@ namespace Files.Shared.Cloud
 				return ValueTask.FromResult(CloudLocationContext.Unknown);
 			}
 
-			// 2. Check root cache
-			if (_rootCache.TryGetValue(root, out var cachedContext))
-			{
-				return ValueTask.FromResult(cachedContext);
-			}
-
-			// 3. Check configured root overrides
+			// 2. Check configured root overrides. These may be subfolders of an otherwise local drive, so they are
+			//    evaluated before, and never stored in, the per-drive-root cache.
 			foreach (var configuredRoot in _configuredEgnyteRoots)
 			{
 				if (root.Equals(configuredRoot, StringComparison.OrdinalIgnoreCase) ||
 				    normalized.StartsWith(configuredRoot, StringComparison.OrdinalIgnoreCase))
 				{
-					var egnyteContext = new CloudLocationContext(
+					return ValueTask.FromResult(new CloudLocationContext(
 						CloudLocationKind.Egnyte,
 						"egnyte",
 						IsCloudBacked: true,
-						HasHydrationRisk: true);
-
-					_rootCache[root] = egnyteContext;
-					return ValueTask.FromResult(egnyteContext);
+						HasHydrationRisk: true));
 				}
+			}
+
+			// 3. Check root cache
+			if (_rootCache.TryGetValue(root, out var cachedContext))
+			{
+				return ValueTask.FromResult(cachedContext);
 			}
 
 			// 4. Resolve mapped drive to remote UNC if resolver provided

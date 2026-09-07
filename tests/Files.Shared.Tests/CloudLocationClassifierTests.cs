@@ -99,6 +99,21 @@ namespace Files.Shared.Tests.Cloud
 		}
 
 		[TestMethod]
+		public async Task ClassifyAsync_ConfiguredSubfolderRoot_IsIndependentOfDriveRootClassification()
+		{
+			var classifier = new CloudLocationClassifier(configuredEgnyteRoots: new[] { @"C:\Egnyte\Shared" });
+
+			// A sibling path on the same drive classified first must not poison the configured root, and vice versa
+			var local = await classifier.ClassifyAsync(@"C:\Users\JohnDoe\notes.txt");
+			var egnyte = await classifier.ClassifyAsync(@"C:\Egnyte\Shared\Projects\Plan.pdf");
+			var localAgain = await classifier.ClassifyAsync(@"C:\Windows\explorer.exe");
+
+			Assert.AreEqual(CloudLocationKind.Local, local.Kind);
+			Assert.AreEqual(CloudLocationKind.Egnyte, egnyte.Kind);
+			Assert.AreEqual(CloudLocationKind.Local, localAgain.Kind);
+		}
+
+		[TestMethod]
 		public async Task ClassifyAsync_EmptyOrNull_ReturnsUnknown()
 		{
 			var classifier = new CloudLocationClassifier();
