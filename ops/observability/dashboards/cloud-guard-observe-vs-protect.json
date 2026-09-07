@@ -1,1063 +1,1018 @@
 {
-  "schemaVersion": "v6",
-  "generateName": true,
+  "version": "v5",
+  "name": "",
+  "title": "Files Cloud Guard: Observe vs Protect",
+  "description": "Passive hydration of cloud-backed locations by Files. Compare Observe (baseline) against Protect.",
   "tags": [
     "files-cloud-guard"
   ],
-  "image": "",
-  "spec": {
-    "display": {
-      "name": "Files Cloud Guard: Observe vs Protect",
-      "description": "Passive hydration of cloud-backed locations by Files. Use the mode variable to compare Observe (baseline) against Protect."
+  "uploadedGrafana": false,
+  "panelMap": {},
+  "layout": [
+    {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 0,
+      "i": "b50b0a5d-a913-43e9-b269-9d8457278586",
+      "moved": false,
+      "static": false
     },
-    "duration": "",
-    "refreshInterval": "",
-    "variables": [
-      {
-        "kind": "ListVariable",
-        "spec": {
-          "display": {
-            "name": "mode",
-            "description": ""
-          },
-          "defaultValue": "",
-          "allowAllValue": true,
-          "allowMultiple": true,
-          "customAllValue": "",
-          "capturingRegexp": "",
-          "sort": "none",
-          "plugin": {
-            "kind": "signoz/DynamicVariable",
-            "spec": {
-              "name": "optimization.mode",
-              "signal": "metrics"
-            }
-          },
-          "name": "mode"
-        }
-      },
-      {
-        "kind": "ListVariable",
-        "spec": {
-          "display": {
-            "name": "provider",
-            "description": ""
-          },
-          "defaultValue": "egnyte",
-          "allowAllValue": false,
-          "allowMultiple": false,
-          "customAllValue": "",
-          "capturingRegexp": "",
-          "sort": "none",
-          "plugin": {
-            "kind": "signoz/DynamicVariable",
-            "spec": {
-              "name": "provider.kind",
-              "signal": "metrics"
-            }
-          },
-          "name": "provider"
-        }
-      }
-    ],
-    "panels": {
-      "01a2994e-c871-4328-84c2-b5900ad2b324": {
-        "kind": "Panel",
-        "spec": {
-          "display": {
-            "name": "Hydrating background thumbnail requests",
-            "description": "Uncached shell thumbnail requests, which read file content. Protect should hold this at zero."
-          },
-          "plugin": {
-            "kind": "signoz/TimeSeriesPanel",
-            "spec": {
-              "visualization": {
-                "timePreference": "global_time",
-                "fillSpans": false
-              },
-              "formatting": {
-                "unit": "none",
-                "decimalPrecision": "2"
-              },
-              "chartAppearance": {
-                "lineInterpolation": "spline",
-                "showPoints": false,
-                "lineStyle": "solid",
-                "fillMode": "none",
-                "spanGaps": {
-                  "fillOnlyBelow": false,
-                  "fillLessThan": ""
-                }
-              },
-              "axes": {
-                "softMin": 0,
-                "softMax": 0,
-                "isLogScale": false
-              },
-              "legend": {
-                "position": "bottom",
-                "mode": "list",
-                "customColors": null
-              },
-              "thresholds": null
-            }
-          },
-          "queries": [
+    {
+      "h": 4,
+      "w": 6,
+      "x": 6,
+      "y": 0,
+      "i": "d29ceca8-6eda-469f-8915-cd8259cf31af",
+      "moved": false,
+      "static": false
+    },
+    {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 4,
+      "i": "93d4bd11-2c23-4ca5-8b89-f3104c46d6fc",
+      "moved": false,
+      "static": false
+    },
+    {
+      "h": 4,
+      "w": 6,
+      "x": 6,
+      "y": 4,
+      "i": "a699e2b7-1836-4a0a-b822-32a8603f5944",
+      "moved": false,
+      "static": false
+    },
+    {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 8,
+      "i": "dcfa0536-d98a-40a9-b3a0-53bd2945c620",
+      "moved": false,
+      "static": false
+    },
+    {
+      "h": 4,
+      "w": 6,
+      "x": 6,
+      "y": 8,
+      "i": "ef6adf5a-9203-4222-9a3a-0313c333922b",
+      "moved": false,
+      "static": false
+    },
+    {
+      "h": 3,
+      "w": 4,
+      "x": 0,
+      "y": 12,
+      "i": "82bb5fb5-a996-4f93-9054-4c838e33452d",
+      "moved": false,
+      "static": false
+    },
+    {
+      "h": 3,
+      "w": 4,
+      "x": 4,
+      "y": 12,
+      "i": "2ed0ee67-46c5-48c0-bd03-7b187ada6009",
+      "moved": false,
+      "static": false
+    },
+    {
+      "h": 3,
+      "w": 4,
+      "x": 8,
+      "y": 12,
+      "i": "a83b3d0f-12ef-4c03-b6eb-3ad327ab20cc",
+      "moved": false,
+      "static": false
+    }
+  ],
+  "variables": {
+    "704d58e7-7376-4392-af1a-20c3631da0c9": {
+      "allSelected": true,
+      "customValue": "",
+      "description": "",
+      "id": "704d58e7-7376-4392-af1a-20c3631da0c9",
+      "modificationUUID": "a0ea12a8-7649-4454-970d-afb65e517c5c",
+      "multiSelect": true,
+      "name": "mode",
+      "order": 0,
+      "queryValue": "SELECT JSONExtractString(labels, 'optimization.mode') AS `mode`\nFROM signoz_metrics.time_series_v4_1day\nWHERE metric_name = 'files.cloud.operations'\nGROUP BY `mode`",
+      "selectedValue": "",
+      "showALLOption": true,
+      "sort": "DISABLED",
+      "textboxValue": "",
+      "type": "QUERY"
+    },
+    "bd0e01f9-04fc-40da-8c1b-60d33c1ab8ae": {
+      "allSelected": false,
+      "customValue": "",
+      "description": "",
+      "id": "bd0e01f9-04fc-40da-8c1b-60d33c1ab8ae",
+      "modificationUUID": "7fd35889-e453-4959-aeea-780d0a001b6e",
+      "multiSelect": false,
+      "name": "provider",
+      "order": 0,
+      "queryValue": "SELECT JSONExtractString(labels, 'provider.kind') AS `provider`\nFROM signoz_metrics.time_series_v4_1day\nWHERE metric_name = 'files.cloud.operations'\nGROUP BY `provider`",
+      "selectedValue": "egnyte",
+      "showALLOption": false,
+      "sort": "DISABLED",
+      "textboxValue": "",
+      "type": "QUERY"
+    }
+  },
+  "widgets": [
+    {
+      "id": "b50b0a5d-a913-43e9-b269-9d8457278586",
+      "title": "Hydrating background thumbnail requests",
+      "description": "Uncached shell thumbnail requests, which read file content. Protect should hold this at zero.",
+      "panelTypes": "graph",
+      "yAxisUnit": "none",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "query": {
+        "id": "4ce68e44-56c6-445b-bfea-bf2b4eae23c7",
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
             {
-              "kind": "time_series",
-              "spec": {
-                "plugin": {
-                  "kind": "signoz/CompositeQuery",
-                  "spec": {
-                    "queries": [
-                      {
-                        "type": "builder_query",
-                        "spec": {
-                          "name": "A",
-                          "stepInterval": 60,
-                          "signal": "metrics",
-                          "source": "",
-                          "aggregations": [
-                            {
-                              "metricName": "files.cloud.operations",
-                              "temporality": "",
-                              "timeAggregation": "increase",
-                              "spaceAggregation": "sum",
-                              "reduceTo": "sum"
-                            }
-                          ],
-                          "disabled": false,
-                          "filter": {
-                            "expression": "provider.kind = $provider optimization.mode in $mode access.origin = 'background'"
-                          },
-                          "groupBy": [
-                            {
-                              "name": "optimization.mode",
-                              "signal": "",
-                              "fieldContext": "attribute",
-                              "fieldDataType": "string"
-                            }
-                          ],
-                          "order": [],
-                          "having": {
-                            "expression": ""
-                          },
-                          "functions": [],
-                          "legend": "{{optimization.mode}}"
-                        }
-                      }
-                    ]
-                  }
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "optimization.mode",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "optimization.mode--string--tag--false"
                 }
+              ],
+              "having": {
+                "expression": ""
+              },
+              "legend": "{{optimization.mode}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.operations",
+                  "temporality": null,
+                  "timeAggregation": "increase",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "sum"
+                }
+              ],
+              "filter": {
+                "expression": "provider.kind = $provider AND optimization.mode IN $mode AND access.origin = 'background'"
               }
             }
           ],
-          "links": []
-        }
-      },
-      "c05e309d-456a-4cea-a580-87a93285fce5": {
-        "kind": "Panel",
-        "spec": {
-          "display": {
-            "name": "Thumbnail outcomes",
-            "description": "Cache hits vs misses vs generic fallbacks per mode."
-          },
-          "plugin": {
-            "kind": "signoz/TimeSeriesPanel",
-            "spec": {
-              "visualization": {
-                "timePreference": "global_time",
-                "fillSpans": false
-              },
-              "formatting": {
-                "unit": "none",
-                "decimalPrecision": "2"
-              },
-              "chartAppearance": {
-                "lineInterpolation": "spline",
-                "showPoints": false,
-                "lineStyle": "solid",
-                "fillMode": "none",
-                "spanGaps": {
-                  "fillOnlyBelow": false,
-                  "fillLessThan": ""
-                }
-              },
-              "axes": {
-                "softMin": 0,
-                "softMax": 0,
-                "isLogScale": false
-              },
-              "legend": {
-                "position": "bottom",
-                "mode": "list",
-                "customColors": null
-              },
-              "thresholds": null
-            }
-          },
-          "queries": [
-            {
-              "kind": "time_series",
-              "spec": {
-                "plugin": {
-                  "kind": "signoz/CompositeQuery",
-                  "spec": {
-                    "queries": [
-                      {
-                        "type": "builder_query",
-                        "spec": {
-                          "name": "A",
-                          "stepInterval": 60,
-                          "signal": "metrics",
-                          "source": "",
-                          "aggregations": [
-                            {
-                              "metricName": "files.cloud.thumbnail.cache_hits",
-                              "temporality": "",
-                              "timeAggregation": "increase",
-                              "spaceAggregation": "sum",
-                              "reduceTo": "sum"
-                            }
-                          ],
-                          "disabled": false,
-                          "filter": {
-                            "expression": "provider.kind = $provider optimization.mode in $mode"
-                          },
-                          "groupBy": [
-                            {
-                              "name": "optimization.mode",
-                              "signal": "",
-                              "fieldContext": "attribute",
-                              "fieldDataType": "string"
-                            }
-                          ],
-                          "order": [],
-                          "having": {
-                            "expression": ""
-                          },
-                          "functions": [],
-                          "legend": "cache hit - {{optimization.mode}}"
-                        }
-                      },
-                      {
-                        "type": "builder_query",
-                        "spec": {
-                          "name": "B",
-                          "stepInterval": 60,
-                          "signal": "metrics",
-                          "source": "",
-                          "aggregations": [
-                            {
-                              "metricName": "files.cloud.thumbnail.cache_misses",
-                              "temporality": "",
-                              "timeAggregation": "increase",
-                              "spaceAggregation": "sum",
-                              "reduceTo": "sum"
-                            }
-                          ],
-                          "disabled": false,
-                          "filter": {
-                            "expression": "provider.kind = $provider optimization.mode in $mode"
-                          },
-                          "groupBy": [
-                            {
-                              "name": "optimization.mode",
-                              "signal": "",
-                              "fieldContext": "attribute",
-                              "fieldDataType": "string"
-                            }
-                          ],
-                          "order": [],
-                          "having": {
-                            "expression": ""
-                          },
-                          "functions": [],
-                          "legend": "cache miss - {{optimization.mode}}"
-                        }
-                      },
-                      {
-                        "type": "builder_query",
-                        "spec": {
-                          "name": "C",
-                          "stepInterval": 60,
-                          "signal": "metrics",
-                          "source": "",
-                          "aggregations": [
-                            {
-                              "metricName": "files.cloud.thumbnail.generic_fallbacks",
-                              "temporality": "",
-                              "timeAggregation": "increase",
-                              "spaceAggregation": "sum",
-                              "reduceTo": "sum"
-                            }
-                          ],
-                          "disabled": false,
-                          "filter": {
-                            "expression": "provider.kind = $provider optimization.mode in $mode"
-                          },
-                          "groupBy": [
-                            {
-                              "name": "optimization.mode",
-                              "signal": "",
-                              "fieldContext": "attribute",
-                              "fieldDataType": "string"
-                            }
-                          ],
-                          "order": [],
-                          "having": {
-                            "expression": ""
-                          },
-                          "functions": [],
-                          "legend": "generic fallback - {{optimization.mode}}"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          ],
-          "links": []
-        }
-      },
-      "3bec0bf1-1a18-4fd3-87c1-2c8dd78314b8": {
-        "kind": "Panel",
-        "spec": {
-          "display": {
-            "name": "Preview loads",
-            "description": "Deferred cards vs explicit Load full preview clicks."
-          },
-          "plugin": {
-            "kind": "signoz/TimeSeriesPanel",
-            "spec": {
-              "visualization": {
-                "timePreference": "global_time",
-                "fillSpans": false
-              },
-              "formatting": {
-                "unit": "none",
-                "decimalPrecision": "2"
-              },
-              "chartAppearance": {
-                "lineInterpolation": "spline",
-                "showPoints": false,
-                "lineStyle": "solid",
-                "fillMode": "none",
-                "spanGaps": {
-                  "fillOnlyBelow": false,
-                  "fillLessThan": ""
-                }
-              },
-              "axes": {
-                "softMin": 0,
-                "softMax": 0,
-                "isLogScale": false
-              },
-              "legend": {
-                "position": "bottom",
-                "mode": "list",
-                "customColors": null
-              },
-              "thresholds": null
-            }
-          },
-          "queries": [
-            {
-              "kind": "time_series",
-              "spec": {
-                "plugin": {
-                  "kind": "signoz/CompositeQuery",
-                  "spec": {
-                    "queries": [
-                      {
-                        "type": "builder_query",
-                        "spec": {
-                          "name": "A",
-                          "stepInterval": 60,
-                          "signal": "metrics",
-                          "source": "",
-                          "aggregations": [
-                            {
-                              "metricName": "files.cloud.preview.deferred",
-                              "temporality": "",
-                              "timeAggregation": "increase",
-                              "spaceAggregation": "sum",
-                              "reduceTo": "sum"
-                            }
-                          ],
-                          "disabled": false,
-                          "filter": {
-                            "expression": "provider.kind = $provider optimization.mode in $mode"
-                          },
-                          "groupBy": [
-                            {
-                              "name": "optimization.mode",
-                              "signal": "",
-                              "fieldContext": "attribute",
-                              "fieldDataType": "string"
-                            }
-                          ],
-                          "order": [],
-                          "having": {
-                            "expression": ""
-                          },
-                          "functions": [],
-                          "legend": "deferred - {{optimization.mode}}"
-                        }
-                      },
-                      {
-                        "type": "builder_query",
-                        "spec": {
-                          "name": "B",
-                          "stepInterval": 60,
-                          "signal": "metrics",
-                          "source": "",
-                          "aggregations": [
-                            {
-                              "metricName": "files.cloud.preview.explicit_loads",
-                              "temporality": "",
-                              "timeAggregation": "increase",
-                              "spaceAggregation": "sum",
-                              "reduceTo": "sum"
-                            }
-                          ],
-                          "disabled": false,
-                          "filter": {
-                            "expression": "provider.kind = $provider optimization.mode in $mode"
-                          },
-                          "groupBy": [
-                            {
-                              "name": "optimization.mode",
-                              "signal": "",
-                              "fieldContext": "attribute",
-                              "fieldDataType": "string"
-                            }
-                          ],
-                          "order": [],
-                          "having": {
-                            "expression": ""
-                          },
-                          "functions": [],
-                          "legend": "explicit load - {{optimization.mode}}"
-                        }
-                      },
-                      {
-                        "type": "builder_query",
-                        "spec": {
-                          "name": "C",
-                          "stepInterval": 60,
-                          "signal": "metrics",
-                          "source": "",
-                          "aggregations": [
-                            {
-                              "metricName": "files.cloud.operations",
-                              "temporality": "",
-                              "timeAggregation": "increase",
-                              "spaceAggregation": "sum",
-                              "reduceTo": "sum"
-                            }
-                          ],
-                          "disabled": false,
-                          "filter": {
-                            "expression": "provider.kind = $provider optimization.mode in $mode preview.result = 'direct_load'"
-                          },
-                          "groupBy": [
-                            {
-                              "name": "optimization.mode",
-                              "signal": "",
-                              "fieldContext": "attribute",
-                              "fieldDataType": "string"
-                            }
-                          ],
-                          "order": [],
-                          "having": {
-                            "expression": ""
-                          },
-                          "functions": [],
-                          "legend": "direct load - {{optimization.mode}}"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          ],
-          "links": []
-        }
-      },
-      "46489990-c078-44ce-b044-86a13a1d629b": {
-        "kind": "Panel",
-        "spec": {
-          "display": {
-            "name": "Policy decisions",
-            "description": "What the mode gate did with each interaction."
-          },
-          "plugin": {
-            "kind": "signoz/TimeSeriesPanel",
-            "spec": {
-              "visualization": {
-                "timePreference": "global_time",
-                "fillSpans": false
-              },
-              "formatting": {
-                "unit": "none",
-                "decimalPrecision": "2"
-              },
-              "chartAppearance": {
-                "lineInterpolation": "spline",
-                "showPoints": false,
-                "lineStyle": "solid",
-                "fillMode": "none",
-                "spanGaps": {
-                  "fillOnlyBelow": false,
-                  "fillLessThan": ""
-                }
-              },
-              "axes": {
-                "softMin": 0,
-                "softMax": 0,
-                "isLogScale": false
-              },
-              "legend": {
-                "position": "bottom",
-                "mode": "list",
-                "customColors": null
-              },
-              "thresholds": null
-            }
-          },
-          "queries": [
-            {
-              "kind": "time_series",
-              "spec": {
-                "plugin": {
-                  "kind": "signoz/CompositeQuery",
-                  "spec": {
-                    "queries": [
-                      {
-                        "type": "builder_query",
-                        "spec": {
-                          "name": "A",
-                          "stepInterval": 60,
-                          "signal": "metrics",
-                          "source": "",
-                          "aggregations": [
-                            {
-                              "metricName": "files.cloud.policy.decisions",
-                              "temporality": "",
-                              "timeAggregation": "increase",
-                              "spaceAggregation": "sum",
-                              "reduceTo": "sum"
-                            }
-                          ],
-                          "disabled": false,
-                          "filter": {
-                            "expression": "provider.kind = $provider optimization.mode in $mode"
-                          },
-                          "groupBy": [
-                            {
-                              "name": "policy.decision",
-                              "signal": "",
-                              "fieldContext": "attribute",
-                              "fieldDataType": "string"
-                            },
-                            {
-                              "name": "optimization.mode",
-                              "signal": "",
-                              "fieldContext": "attribute",
-                              "fieldDataType": "string"
-                            }
-                          ],
-                          "order": [],
-                          "having": {
-                            "expression": ""
-                          },
-                          "functions": [],
-                          "legend": "{{policy.decision}} - {{optimization.mode}}"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          ],
-          "links": []
-        }
-      },
-      "09af0a5e-c7b9-421a-9922-123298256777": {
-        "kind": "Panel",
-        "spec": {
-          "display": {
-            "name": "Operations by type and origin",
-            "description": "Where cloud interactions come from."
-          },
-          "plugin": {
-            "kind": "signoz/TimeSeriesPanel",
-            "spec": {
-              "visualization": {
-                "timePreference": "global_time",
-                "fillSpans": false
-              },
-              "formatting": {
-                "unit": "none",
-                "decimalPrecision": "2"
-              },
-              "chartAppearance": {
-                "lineInterpolation": "spline",
-                "showPoints": false,
-                "lineStyle": "solid",
-                "fillMode": "none",
-                "spanGaps": {
-                  "fillOnlyBelow": false,
-                  "fillLessThan": ""
-                }
-              },
-              "axes": {
-                "softMin": 0,
-                "softMax": 0,
-                "isLogScale": false
-              },
-              "legend": {
-                "position": "bottom",
-                "mode": "list",
-                "customColors": null
-              },
-              "thresholds": null
-            }
-          },
-          "queries": [
-            {
-              "kind": "time_series",
-              "spec": {
-                "plugin": {
-                  "kind": "signoz/CompositeQuery",
-                  "spec": {
-                    "queries": [
-                      {
-                        "type": "builder_query",
-                        "spec": {
-                          "name": "A",
-                          "stepInterval": 60,
-                          "signal": "metrics",
-                          "source": "",
-                          "aggregations": [
-                            {
-                              "metricName": "files.cloud.operations",
-                              "temporality": "",
-                              "timeAggregation": "increase",
-                              "spaceAggregation": "sum",
-                              "reduceTo": "sum"
-                            }
-                          ],
-                          "disabled": false,
-                          "filter": {
-                            "expression": "provider.kind = $provider optimization.mode in $mode"
-                          },
-                          "groupBy": [
-                            {
-                              "name": "operation.name",
-                              "signal": "",
-                              "fieldContext": "attribute",
-                              "fieldDataType": "string"
-                            },
-                            {
-                              "name": "access.origin",
-                              "signal": "",
-                              "fieldContext": "attribute",
-                              "fieldDataType": "string"
-                            }
-                          ],
-                          "order": [],
-                          "having": {
-                            "expression": ""
-                          },
-                          "functions": [],
-                          "legend": "{{operation.name}} / {{access.origin}}"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          ],
-          "links": []
-        }
-      },
-      "4517dd13-c634-449d-8418-ecb9f56db70f": {
-        "kind": "Panel",
-        "spec": {
-          "display": {
-            "name": "Operation duration p95",
-            "description": "Latency of cloud interactions; deferring should cut the tail."
-          },
-          "plugin": {
-            "kind": "signoz/TimeSeriesPanel",
-            "spec": {
-              "visualization": {
-                "timePreference": "global_time",
-                "fillSpans": false
-              },
-              "formatting": {
-                "unit": "ms",
-                "decimalPrecision": "2"
-              },
-              "chartAppearance": {
-                "lineInterpolation": "spline",
-                "showPoints": false,
-                "lineStyle": "solid",
-                "fillMode": "none",
-                "spanGaps": {
-                  "fillOnlyBelow": false,
-                  "fillLessThan": ""
-                }
-              },
-              "axes": {
-                "softMin": 0,
-                "softMax": 0,
-                "isLogScale": false
-              },
-              "legend": {
-                "position": "bottom",
-                "mode": "list",
-                "customColors": null
-              },
-              "thresholds": null
-            }
-          },
-          "queries": [
-            {
-              "kind": "time_series",
-              "spec": {
-                "plugin": {
-                  "kind": "signoz/CompositeQuery",
-                  "spec": {
-                    "queries": [
-                      {
-                        "type": "builder_query",
-                        "spec": {
-                          "name": "A",
-                          "stepInterval": 60,
-                          "signal": "metrics",
-                          "source": "",
-                          "aggregations": [
-                            {
-                              "metricName": "files.cloud.operation.duration",
-                              "temporality": "",
-                              "timeAggregation": "",
-                              "spaceAggregation": "p95",
-                              "reduceTo": "avg"
-                            }
-                          ],
-                          "disabled": false,
-                          "filter": {
-                            "expression": "provider.kind = $provider optimization.mode in $mode"
-                          },
-                          "groupBy": [
-                            {
-                              "name": "operation.name",
-                              "signal": "",
-                              "fieldContext": "attribute",
-                              "fieldDataType": "string"
-                            },
-                            {
-                              "name": "optimization.mode",
-                              "signal": "",
-                              "fieldContext": "attribute",
-                              "fieldDataType": "string"
-                            }
-                          ],
-                          "order": [],
-                          "having": {
-                            "expression": ""
-                          },
-                          "functions": [],
-                          "legend": "{{operation.name}} - {{optimization.mode}}"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          ],
-          "links": []
-        }
-      },
-      "2c0e4d5a-d5e3-41ec-bb85-a188cf732dd1": {
-        "kind": "Panel",
-        "spec": {
-          "display": {
-            "name": "Background requests (total)",
-            "description": "Hydrating thumbnail requests in the selected range."
-          },
-          "plugin": {
-            "kind": "signoz/NumberPanel",
-            "spec": {
-              "visualization": {
-                "timePreference": "global_time"
-              },
-              "formatting": {
-                "unit": "none",
-                "decimalPrecision": "0"
-              },
-              "thresholds": null
-            }
-          },
-          "queries": [
-            {
-              "kind": "scalar",
-              "spec": {
-                "name": "A",
-                "plugin": {
-                  "kind": "signoz/BuilderQuery",
-                  "spec": {
-                    "name": "A",
-                    "stepInterval": 60,
-                    "signal": "metrics",
-                    "source": "",
-                    "aggregations": [
-                      {
-                        "metricName": "files.cloud.operations",
-                        "temporality": "",
-                        "timeAggregation": "increase",
-                        "spaceAggregation": "sum",
-                        "reduceTo": "sum"
-                      }
-                    ],
-                    "disabled": false,
-                    "filter": {
-                      "expression": "provider.kind = $provider optimization.mode in $mode access.origin = 'background'"
-                    },
-                    "groupBy": [],
-                    "order": [],
-                    "having": {
-                      "expression": ""
-                    },
-                    "functions": [],
-                    "legend": ""
-                  }
-                }
-              }
-            }
-          ],
-          "links": []
-        }
-      },
-      "50d7c01c-13da-4918-a52e-a95cc91f1518": {
-        "kind": "Panel",
-        "spec": {
-          "display": {
-            "name": "Generic fallbacks (total)",
-            "description": "Thumbnails served as type icons instead of hydrating."
-          },
-          "plugin": {
-            "kind": "signoz/NumberPanel",
-            "spec": {
-              "visualization": {
-                "timePreference": "global_time"
-              },
-              "formatting": {
-                "unit": "none",
-                "decimalPrecision": "0"
-              },
-              "thresholds": null
-            }
-          },
-          "queries": [
-            {
-              "kind": "scalar",
-              "spec": {
-                "name": "A",
-                "plugin": {
-                  "kind": "signoz/BuilderQuery",
-                  "spec": {
-                    "name": "A",
-                    "stepInterval": 60,
-                    "signal": "metrics",
-                    "source": "",
-                    "aggregations": [
-                      {
-                        "metricName": "files.cloud.thumbnail.generic_fallbacks",
-                        "temporality": "",
-                        "timeAggregation": "increase",
-                        "spaceAggregation": "sum",
-                        "reduceTo": "sum"
-                      }
-                    ],
-                    "disabled": false,
-                    "filter": {
-                      "expression": "provider.kind = $provider optimization.mode in $mode"
-                    },
-                    "groupBy": [],
-                    "order": [],
-                    "having": {
-                      "expression": ""
-                    },
-                    "functions": [],
-                    "legend": ""
-                  }
-                }
-              }
-            }
-          ],
-          "links": []
-        }
-      },
-      "7e4482b8-fe91-4425-b9e4-8e0982369500": {
-        "kind": "Panel",
-        "spec": {
-          "display": {
-            "name": "Failures (total)",
-            "description": "Recorded failures by any cloud interaction."
-          },
-          "plugin": {
-            "kind": "signoz/NumberPanel",
-            "spec": {
-              "visualization": {
-                "timePreference": "global_time"
-              },
-              "formatting": {
-                "unit": "none",
-                "decimalPrecision": "0"
-              },
-              "thresholds": null
-            }
-          },
-          "queries": [
-            {
-              "kind": "scalar",
-              "spec": {
-                "name": "A",
-                "plugin": {
-                  "kind": "signoz/BuilderQuery",
-                  "spec": {
-                    "name": "A",
-                    "stepInterval": 60,
-                    "signal": "metrics",
-                    "source": "",
-                    "aggregations": [
-                      {
-                        "metricName": "files.cloud.failures",
-                        "temporality": "",
-                        "timeAggregation": "increase",
-                        "spaceAggregation": "sum",
-                        "reduceTo": "sum"
-                      }
-                    ],
-                    "disabled": false,
-                    "filter": {
-                      "expression": "provider.kind = $provider optimization.mode in $mode"
-                    },
-                    "groupBy": [],
-                    "order": [],
-                    "having": {
-                      "expression": ""
-                    },
-                    "functions": [],
-                    "legend": ""
-                  }
-                }
-              }
-            }
-          ],
-          "links": []
-        }
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
       }
     },
-    "layouts": [
-      {
-        "kind": "Grid",
-        "spec": {
-          "items": [
+    {
+      "id": "d29ceca8-6eda-469f-8915-cd8259cf31af",
+      "title": "Thumbnail outcomes",
+      "description": "Cache hits vs misses vs generic fallbacks per mode.",
+      "panelTypes": "graph",
+      "yAxisUnit": "none",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "query": {
+        "id": "cf719505-f119-4e7f-be5c-e2c8666234d0",
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
             {
-              "x": 0,
-              "y": 0,
-              "width": 6,
-              "height": 6,
-              "content": {
-                "$ref": "#/spec/panels/01a2994e-c871-4328-84c2-b5900ad2b324"
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "optimization.mode",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "optimization.mode--string--tag--false"
+                }
+              ],
+              "having": {
+                "expression": ""
+              },
+              "legend": "cache hit - {{optimization.mode}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.thumbnail.cache_hits",
+                  "temporality": null,
+                  "timeAggregation": "increase",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "sum"
+                }
+              ],
+              "filter": {
+                "expression": "provider.kind = $provider AND optimization.mode IN $mode"
               }
             },
             {
-              "x": 6,
-              "y": 0,
-              "width": 6,
-              "height": 6,
-              "content": {
-                "$ref": "#/spec/panels/c05e309d-456a-4cea-a580-87a93285fce5"
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "B",
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "optimization.mode",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "optimization.mode--string--tag--false"
+                }
+              ],
+              "having": {
+                "expression": ""
+              },
+              "legend": "cache miss - {{optimization.mode}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "B",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.thumbnail.cache_misses",
+                  "temporality": null,
+                  "timeAggregation": "increase",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "sum"
+                }
+              ],
+              "filter": {
+                "expression": "provider.kind = $provider AND optimization.mode IN $mode"
               }
             },
             {
-              "x": 0,
-              "y": 6,
-              "width": 6,
-              "height": 6,
-              "content": {
-                "$ref": "#/spec/panels/3bec0bf1-1a18-4fd3-87c1-2c8dd78314b8"
-              }
-            },
-            {
-              "x": 6,
-              "y": 6,
-              "width": 6,
-              "height": 6,
-              "content": {
-                "$ref": "#/spec/panels/46489990-c078-44ce-b044-86a13a1d629b"
-              }
-            },
-            {
-              "x": 0,
-              "y": 12,
-              "width": 6,
-              "height": 6,
-              "content": {
-                "$ref": "#/spec/panels/09af0a5e-c7b9-421a-9922-123298256777"
-              }
-            },
-            {
-              "x": 6,
-              "y": 12,
-              "width": 6,
-              "height": 6,
-              "content": {
-                "$ref": "#/spec/panels/4517dd13-c634-449d-8418-ecb9f56db70f"
-              }
-            },
-            {
-              "x": 0,
-              "y": 18,
-              "width": 4,
-              "height": 4,
-              "content": {
-                "$ref": "#/spec/panels/2c0e4d5a-d5e3-41ec-bb85-a188cf732dd1"
-              }
-            },
-            {
-              "x": 4,
-              "y": 18,
-              "width": 4,
-              "height": 4,
-              "content": {
-                "$ref": "#/spec/panels/50d7c01c-13da-4918-a52e-a95cc91f1518"
-              }
-            },
-            {
-              "x": 8,
-              "y": 18,
-              "width": 4,
-              "height": 4,
-              "content": {
-                "$ref": "#/spec/panels/7e4482b8-fe91-4425-b9e4-8e0982369500"
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "C",
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "optimization.mode",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "optimization.mode--string--tag--false"
+                }
+              ],
+              "having": {
+                "expression": ""
+              },
+              "legend": "generic fallback - {{optimization.mode}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "C",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.thumbnail.generic_fallbacks",
+                  "temporality": null,
+                  "timeAggregation": "increase",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "sum"
+                }
+              ],
+              "filter": {
+                "expression": "provider.kind = $provider AND optimization.mode IN $mode"
               }
             }
-          ]
-        }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
       }
-    ],
-    "links": []
-  }
+    },
+    {
+      "id": "93d4bd11-2c23-4ca5-8b89-f3104c46d6fc",
+      "title": "Preview loads",
+      "description": "Deferred cards vs explicit Load full preview clicks vs direct loads.",
+      "panelTypes": "graph",
+      "yAxisUnit": "none",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "query": {
+        "id": "93b26cf5-1376-4f10-9004-4847eb53013e",
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "optimization.mode",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "optimization.mode--string--tag--false"
+                }
+              ],
+              "having": {
+                "expression": ""
+              },
+              "legend": "deferred - {{optimization.mode}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.preview.deferred",
+                  "temporality": null,
+                  "timeAggregation": "increase",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "sum"
+                }
+              ],
+              "filter": {
+                "expression": "provider.kind = $provider AND optimization.mode IN $mode"
+              }
+            },
+            {
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "B",
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "optimization.mode",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "optimization.mode--string--tag--false"
+                }
+              ],
+              "having": {
+                "expression": ""
+              },
+              "legend": "explicit - {{optimization.mode}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "B",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.preview.explicit_loads",
+                  "temporality": null,
+                  "timeAggregation": "increase",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "sum"
+                }
+              ],
+              "filter": {
+                "expression": "provider.kind = $provider AND optimization.mode IN $mode"
+              }
+            },
+            {
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "C",
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "optimization.mode",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "optimization.mode--string--tag--false"
+                }
+              ],
+              "having": {
+                "expression": ""
+              },
+              "legend": "direct - {{optimization.mode}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "C",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.operations",
+                  "temporality": null,
+                  "timeAggregation": "increase",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "sum"
+                }
+              ],
+              "filter": {
+                "expression": "provider.kind = $provider AND optimization.mode IN $mode AND preview.result = 'direct_load'"
+              }
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "a699e2b7-1836-4a0a-b822-32a8603f5944",
+      "title": "Policy decisions",
+      "description": "What the mode gate did with each interaction.",
+      "panelTypes": "graph",
+      "yAxisUnit": "none",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "query": {
+        "id": "9e1b6384-3e03-4836-9cc3-73a192a37542",
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "policy.decision",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "policy.decision--string--tag--false"
+                },
+                {
+                  "key": "optimization.mode",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "optimization.mode--string--tag--false"
+                }
+              ],
+              "having": {
+                "expression": ""
+              },
+              "legend": "{{policy.decision}} - {{optimization.mode}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.policy.decisions",
+                  "temporality": null,
+                  "timeAggregation": "increase",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "sum"
+                }
+              ],
+              "filter": {
+                "expression": "provider.kind = $provider AND optimization.mode IN $mode"
+              }
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "dcfa0536-d98a-40a9-b3a0-53bd2945c620",
+      "title": "Operations by type and origin",
+      "description": "Where cloud interactions come from.",
+      "panelTypes": "graph",
+      "yAxisUnit": "none",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "query": {
+        "id": "23aac66d-25ff-4198-9088-af96f94c0a66",
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "operation.name",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "operation.name--string--tag--false"
+                },
+                {
+                  "key": "access.origin",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "access.origin--string--tag--false"
+                }
+              ],
+              "having": {
+                "expression": ""
+              },
+              "legend": "{{operation.name}} / {{access.origin}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.operations",
+                  "temporality": null,
+                  "timeAggregation": "increase",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "sum"
+                }
+              ],
+              "filter": {
+                "expression": "provider.kind = $provider AND optimization.mode IN $mode"
+              }
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "ef6adf5a-9203-4222-9a3a-0313c333922b",
+      "title": "Operation duration p95",
+      "description": "Latency of cloud interactions.",
+      "panelTypes": "graph",
+      "yAxisUnit": "ms",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "query": {
+        "id": "a293883d-1d57-4f34-a042-1e8af7500812",
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "operation.name",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "operation.name--string--tag--false"
+                },
+                {
+                  "key": "optimization.mode",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "optimization.mode--string--tag--false"
+                }
+              ],
+              "having": {
+                "expression": ""
+              },
+              "legend": "{{operation.name}} - {{optimization.mode}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.operation.duration.bucket",
+                  "temporality": "Cumulative",
+                  "timeAggregation": "rate",
+                  "spaceAggregation": "p95",
+                  "reduceTo": "avg"
+                }
+              ],
+              "filter": {
+                "expression": "provider.kind = $provider AND optimization.mode IN $mode"
+              }
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "82bb5fb5-a996-4f93-9054-4c838e33452d",
+      "title": "Background requests (total)",
+      "description": "Hydrating thumbnail requests in range.",
+      "panelTypes": "value",
+      "yAxisUnit": "none",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "query": {
+        "id": "c74ee7a2-2d55-4b6c-a943-ec88251e9ce1",
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "functions": [],
+              "groupBy": [],
+              "having": {
+                "expression": ""
+              },
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.operations",
+                  "temporality": null,
+                  "timeAggregation": "increase",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "sum"
+                }
+              ],
+              "filter": {
+                "expression": "provider.kind = $provider AND optimization.mode IN $mode AND access.origin = 'background'"
+              }
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "2ed0ee67-46c5-48c0-bd03-7b187ada6009",
+      "title": "Generic fallbacks (total)",
+      "description": "Thumbnails served as type icons instead of hydrating.",
+      "panelTypes": "value",
+      "yAxisUnit": "none",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "query": {
+        "id": "fef01794-f6d4-44a5-b568-f0f7e1c93091",
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "functions": [],
+              "groupBy": [],
+              "having": {
+                "expression": ""
+              },
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.thumbnail.generic_fallbacks",
+                  "temporality": null,
+                  "timeAggregation": "increase",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "sum"
+                }
+              ],
+              "filter": {
+                "expression": "provider.kind = $provider AND optimization.mode IN $mode"
+              }
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "a83b3d0f-12ef-4c03-b6eb-3ad327ab20cc",
+      "title": "Failures (total)",
+      "description": "Recorded failures by any cloud interaction.",
+      "panelTypes": "value",
+      "yAxisUnit": "none",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "query": {
+        "id": "db706671-d564-4eb4-b8cb-922cd9870c66",
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "functions": [],
+              "groupBy": [],
+              "having": {
+                "expression": ""
+              },
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.failures",
+                  "temporality": null,
+                  "timeAggregation": "increase",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "sum"
+                }
+              ],
+              "filter": {
+                "expression": "provider.kind = $provider AND optimization.mode IN $mode"
+              }
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      }
+    }
+  ]
 }
