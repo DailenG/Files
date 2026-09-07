@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>otel-ingress</Name>
+  <Repository>ghcr.io/caddybuilds/caddy-cloudflare:latest</Repository>
+  <Registry>https://github.com/caddybuilds/caddy-cloudflare</Registry>
+  <Network>otel-net</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/DailenG/Files/issues/5</Support>
+  <Project>https://caddyserver.com</Project>
+  <Overview>TLS + bearer-token front door for signoz-aio OTLP/HTTP ingest. Let's Encrypt via Cloudflare DNS-01. Secrets live in /mnt/user/appdata/otel-ingress/.env, loaded with --env-file by ops/observability/unraid/deploy.sh; they are not stored in this template.</Overview>
+  <Category>Network:Web</Category>
+  <WebUI/>
+  <Icon>https://raw.githubusercontent.com/caddyserver/website/master/src/resources/images/caddy-circle-lock.svg</Icon>
+  <ExtraParams>--restart unless-stopped --env-file /mnt/user/appdata/otel-ingress/.env</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <Networking>
+    <Mode>otel-net</Mode>
+    <Publish>
+      <Port>
+        <HostPort>8443</HostPort>
+        <ContainerPort>8443</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+    </Publish>
+  </Networking>
+  <Data>
+    <Volume>
+      <HostDir>/mnt/user/appdata/otel-ingress/Caddyfile</HostDir>
+      <ContainerDir>/etc/caddy/Caddyfile</ContainerDir>
+      <Mode>ro</Mode>
+    </Volume>
+    <Volume>
+      <HostDir>/mnt/user/appdata/otel-ingress/data</HostDir>
+      <ContainerDir>/data</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+    <Volume>
+      <HostDir>/mnt/user/appdata/otel-ingress/config</HostDir>
+      <ContainerDir>/config</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+  </Data>
+  <Environment/>
+  <Config Name="Ingest Port" Target="8443" Default="8443" Mode="tcp" Description="HTTPS OTLP ingest. 443 is owned by the Unraid web UI." Type="Port" Display="always" Required="true" Mask="false">8443</Config>
+  <Config Name="Caddyfile" Target="/etc/caddy/Caddyfile" Default="/mnt/user/appdata/otel-ingress/Caddyfile" Mode="ro" Description="Copied from ops/observability/unraid/Caddyfile by deploy.sh." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/otel-ingress/Caddyfile</Config>
+  <Config Name="Caddy data" Target="/data" Default="/mnt/user/appdata/otel-ingress/data" Mode="rw" Description="Certificates and ACME account." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/otel-ingress/data</Config>
+  <Config Name="Caddy config" Target="/config" Default="/mnt/user/appdata/otel-ingress/config" Mode="rw" Description="Caddy runtime config." Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/otel-ingress/config</Config>
+</Container>

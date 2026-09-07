@@ -3,64 +3,72 @@
 Files exports OTLP/HTTP directly from `CloudTelemetryExportHost` to an internal SigNoz instance. There is no local collector agent on the Windows side; see ADR 0002 item 6 for why.
 
 ```text
-Files.exe  --HTTPS + bearer-->  Nginx Proxy Manager (Unraid)  --docker bridge-->  signoz-aio :4318
-                                                                                   signoz-aio :8080 (UI, VPN only)
+Files.exe  --HTTPS 8443 + bearer-->  otel-ingress (Caddy)  --otel-net-->  signoz-aio :4318
+                                                                          signoz-aio :8080 (UI, LAN)
 ```
 
-Line of sight is the access control: `signoz.<domain>` resolves to the Unraid LAN address, so machines outside the network fail DNS or TCP, and the exporter drops its 2 s batch. Nothing is queued to disk.
+Line of sight is the access control: `otel.pesengineers.dev` is a public A record that resolves to the Unraid LAN address, so machines outside the network (and off VPN) fail to connect and the exporter drops its 2 s batch. Nothing is queued to disk.
 
-## 1. SigNoz container
+## Layout
 
-Community Apps: install **signoz-aio** (JSONbored). It bundles SigNoz UI/API, the signoz-otel-collector, ClickHouse, and ZooKeeper in one container.
+| Piece | Where |
+|---|---|
+| Deploy script, Caddyfile, dockerMan templates | `unraid/` in this directory; copied to `/mnt/user/appdata/otel-ingress/deploy/` on the host |
+| Secrets | `/mnt/user/appdata/otel-ingress/.env` on the host only (`chmod 600`); never in the repository |
+| SigNoz data | `/mnt/user/appdata/signoz-aio/` (ClickHouse, ZooKeeper, SQLite metadata) |
+| Certificates | `/mnt/user/appdata/otel-ingress/data/caddy/` |
+| Docker network | `otel-net`; OTLP ports 4317/4318 are not published on the host |
+| Host ports | `8080` SigNoz UI (LAN), `8443` HTTPS ingest. `443` belongs to the Unraid web UI |
 
-| Setting | Value | Why |
-|---|---|---|
-| Network | `bridge` (the same custom bridge as Nginx Proxy Manager) | Ingest ports stay off the LAN |
-| Port `8080` | do not publish to the host | UI reached through NPM on a VPN-only hostname, or via the Unraid host on the docker network |
-| Port `4317` | do not publish | gRPC ingest is unused |
-| Port `4318` | do not publish | Reached only from NPM on the bridge |
-| ClickHouse data path | cache/SSD share, e.g. `/mnt/cache/appdata/signoz/clickhouse` | ClickHouse on the array is slow |
-| Image tag | pin a specific version, not `latest` | Reproducible pilot |
+## 1. Deploy or update
 
-After first start, create the admin account in the UI, then set retention under **Settings -> General**: traces 7 days, metrics 30 days. These values are quoted in `docs/privacy-and-telemetry.md`; change both together.
-
-## 2. DNS and certificate
-
-Use the Cloudflare-hosted `.dev` zone.
-
-1. Create `A signoz.<domain>` pointing at the Unraid LAN IP. Proxy status: DNS only (grey cloud). A public record with a private address is fine; it simply does not resolve to anything reachable from outside the LAN. If the network already has an internal DNS override for the domain, that works equally well.
-2. Create a Cloudflare API token scoped to `Zone:DNS:Edit` for that zone only.
-3. In Nginx Proxy Manager: **SSL Certificates -> Add -> Let's Encrypt**, domain `signoz.<domain>`, **Use a DNS Challenge**, provider Cloudflare, paste the token. Windows trusts Let's Encrypt out of the box, so no CA is shipped with Files.
-
-`.dev` is on the HSTS preload list; browsers refuse plaintext for it, which is a feature here.
-
-## 3. Reverse proxy (Nginx Proxy Manager)
-
-Create one Proxy Host:
-
-- Domain: `signoz.<domain>`
-- Forward: `http://signoz-aio:4318`
-- SSL: the certificate above, Force SSL on, HTTP/2 on
-- Advanced tab: paste the contents of `npm-ingest.conf` from this directory.
-
-`npm-ingest.conf` does three things: requires `Authorization: Bearer <token>` on every request, exposes only `/v1/traces` and `/v1/metrics`, and answers `404` to everything else. Generate the token once:
+From a checkout, on a machine with SSH access to the Unraid host:
 
 ```powershell
--join ((1..48) | ForEach-Object { '{0:x}' -f (Get-Random -Maximum 16) })
+scp ops/observability/unraid/* root@pes-dev.pes.local:/mnt/user/appdata/otel-ingress/deploy/
+ssh root@pes-dev.pes.local "cd /mnt/user/appdata/otel-ingress/deploy && sed -i 's/\r$//' deploy.sh Caddyfile && ./deploy.sh"
 ```
 
-Put it in both `if` comparisons of `npm-ingest.conf`. One token per pilot cohort; rotating it means editing the proxy host and pushing the new value to pilots.
+`deploy.sh` is idempotent: it creates `otel-net`, pulls both images, recreates both containers, installs the two dockerMan templates so they appear as managed apps, and on first run writes `.env` with a fresh `INGEST_TOKEN`. It refuses to start `otel-ingress` while `CF_API_TOKEN` is still `CHANGE_ME`.
 
-Do not put the UI on this hostname. If the UI needs a name, create a second Proxy Host (`signoz-ui.<domain>` -> `http://signoz-aio:8080`) on an NPM Access List restricted to the VPN subnet.
+`./deploy.sh status` prints container state, issued certificates, and the proxy log tail.
 
-## 4. Windows pilot configuration
+## 2. One-time secrets (`.env`)
+
+| Key | Value |
+|---|---|
+| `INGEST_HOST` | `otel.pesengineers.dev` |
+| `ACME_EMAIL` | mailbox for Let's Encrypt expiry notices |
+| `CF_API_TOKEN` | Cloudflare API token, **Zone > DNS > Edit** on `pesengineers.dev` only. Create at dash.cloudflare.com > My Profile > API Tokens > Create Token > Edit zone DNS template, restrict Zone Resources to the single zone |
+| `INGEST_TOKEN` | generated by `deploy.sh`; the value pilots store in the Windows credential vault |
+
+The Cloudflare OAuth session used by the MCP tooling cannot mint API tokens (`9109 Unauthorized`), so this token is created by hand once. Caddy uses it only for DNS-01 TXT records; the cert renews automatically.
+
+## 3. DNS
+
+Already present in the `pesengineers.dev` zone: `A otel 192.168.76.42`, DNS only (not proxied), TTL 300, commented. No other records in the zone were touched. Off-site resolution returns a private address that is unreachable, which is the intended behaviour.
+
+## 4. Ingest proxy behaviour (`unraid/Caddyfile`)
+
+- Listens on `:8443`; HTTP-to-HTTPS redirect listener disabled (nothing on 80).
+- Requests without `Authorization: Bearer <INGEST_TOKEN>` get `401`.
+- Only `/v1/traces` and `/v1/metrics` are proxied to `signoz-aio:4318`; the header is stripped before forwarding. Everything else is `404`.
+- Warn-level access log to stdout (`docker logs otel-ingress`).
+
+## 5. SigNoz first run
+
+1. Open `http://pes-dev.pes.local:8080` on the LAN, create the admin account.
+2. **Settings > General**: retention traces 7 days, metrics 30 days. These values are quoted in `docs/privacy-and-telemetry.md`; change both together.
+3. Upstream analytics and stats reporting are disabled by the template.
+
+## 6. Windows pilot configuration
 
 In `user_settings.json` (`%LOCALAPPDATA%\Packages\<package>\LocalState\settings\`):
 
 ```json
 "Mode": "Observe",
 "TelemetryEnabled": true,
-"TelemetryEndpoint": "https://signoz.<domain>"
+"TelemetryEndpoint": "https://otel.pesengineers.dev:8443"
 ```
 
 The token is not in that file. Set it once per user through either:
@@ -72,23 +80,23 @@ Restart Files. `debug.log` shows `Cloud telemetry export started in Observe mode
 
 For local development without SigNoz, leave `TelemetryEndpoint` at `http://localhost:4318` and run any OTLP receiver on loopback; plaintext is accepted there only.
 
-## 5. Verification
+## 7. Verification
 
-From a pilot machine:
+From a pilot machine on the LAN or VPN:
 
 ```powershell
-# TLS chain and token check; expect 401 then 200 (empty protobuf body is a valid, empty export)
-curl.exe -s -o NUL -w "%{http_code}`n" https://signoz.<domain>/v1/traces -X POST -H "Content-Type: application/x-protobuf" --data-binary ""
-curl.exe -s -o NUL -w "%{http_code}`n" https://signoz.<domain>/v1/traces -X POST -H "Content-Type: application/x-protobuf" -H "Authorization: Bearer <token>" --data-binary ""
-# anything else is hidden
-curl.exe -s -o NUL -w "%{http_code}`n" https://signoz.<domain>/api/v1/version
+$u = "https://otel.pesengineers.dev:8443"
+# 401 without token, 200 with token (an empty protobuf body is a valid empty export), 404 elsewhere
+curl.exe -s -o NUL -w "%{http_code}`n" "$u/v1/traces"  -X POST -H "Content-Type: application/x-protobuf" --data-binary ""
+curl.exe -s -o NUL -w "%{http_code}`n" "$u/v1/traces"  -X POST -H "Content-Type: application/x-protobuf" -H "Authorization: Bearer <token>" --data-binary ""
+curl.exe -s -o NUL -w "%{http_code}`n" "$u/api/v1/version"
 ```
 
-Then browse a cloud-backed location in Files (Observe mode) and open SigNoz **Services**: `files-cloud-guard` appears within 15 s. Metrics are under **Dashboards -> New -> Query builder**, metric names `files.cloud.*`.
+Then browse a cloud-backed location in Files (Observe mode) and open SigNoz **Services**: `files-cloud-guard` appears within 15 s. Metrics are under **Dashboards > New > Query builder**, metric names `files.cloud.*`.
 
-## 6. Dashboards
+## 8. Dashboards
 
-`dashboards/` holds SigNoz dashboard exports. Import through **Dashboards -> New Dashboard -> Import JSON**. Panels compare Observe vs Protect through a `mode` variable:
+`dashboards/` holds SigNoz dashboard exports. Import through **Dashboards > New Dashboard > Import JSON**. Panels compare Observe vs Protect through a `mode` variable:
 
 - operations per minute by `provider` and `operation`
 - p50 / p95 of `files.cloud.operation.duration`
@@ -103,9 +111,9 @@ Export the JSON from the UI after building a panel set; the schema is version sp
 
 | Symptom | Check |
 |---|---|
+| `otel-ingress` restart loop, log says `API token ... appears invalid` | `CF_API_TOKEN` in `.env` is wrong or still the placeholder |
 | `Cloud telemetry export skipped: endpoint is missing, or is neither loopback nor https.` | `TelemetryEndpoint` must be `https://` for any non-localhost host |
-| Nothing in SigNoz, no warnings in `debug.log` | `curl` tests above; a `401` means the token in the vault differs from `npm-ingest.conf` |
-| `401` from curl with the right token | NPM Advanced config not saved, or a stray space in the `map` value |
-| Certificate errors | DNS challenge failed: token scope, or the zone is not on Cloudflare; NPM shows the certbot log |
-| Data appears from an off-site machine | it resolved `signoz.<domain>`: check for a public override or a split-DNS leak; the record must point at a LAN address only |
-| ClickHouse disk growth | retention in **Settings -> General**; the AIO container has no separate TTL knob |
+| Nothing in SigNoz, no warnings in `debug.log` | `curl` tests above; `401` means the vault token differs from `INGEST_TOKEN` |
+| Certificate errors on the client | `./deploy.sh status` shows no cert: DNS-01 failed. Check token scope, and that `otel.pesengineers.dev` still resolves publicly (the TXT challenge is written to the public zone) |
+| Data appears from an off-site machine | it resolved and reached `192.168.76.42`, so it is on VPN; expected |
+| ClickHouse disk growth | retention in **Settings > General**; the AIO container has no separate TTL knob |

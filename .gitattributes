@@ -63,3 +63,5 @@
 #*.RTF   diff=astextplain
 
 *.h linguist-language=C++
+ops/observability/unraid/deploy.sh text eol=lf
+ops/observability/unraid/Caddyfile text eol=lf
