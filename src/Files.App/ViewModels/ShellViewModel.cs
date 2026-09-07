@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.App.Services.SizeProvider;
+using Files.Shared.Cloud;
 using Files.Shared.Helpers;
 using LibGit2Sharp;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,7 @@ using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -64,6 +66,8 @@ namespace Files.App.ViewModels
 		private readonly IWindowsSecurityService WindowsSecurityService = Ioc.Default.GetRequiredService<IWindowsSecurityService>();
 		private readonly IStorageTrashBinService StorageTrashBinService = Ioc.Default.GetRequiredService<IStorageTrashBinService>();
 		private readonly IContentPageContext ContentPageContext = Ioc.Default.GetRequiredService<IContentPageContext>();
+		private readonly ICloudLocationClassifier cloudLocationClassifier = Ioc.Default.GetRequiredService<ICloudLocationClassifier>();
+		private readonly ICloudInteractionTelemetry cloudTelemetry = Ioc.Default.GetRequiredService<ICloudInteractionTelemetry>();
 
 		// Only used for Binding and ApplyFilesAndFoldersChangesAsync, don't manipulate on this!
 		public BulkConcurrentObservableCollection<ListedItem> FilesAndFolders { get; }
@@ -1434,6 +1438,12 @@ namespace Files.App.ViewModels
 			var thumbnailSize = LayoutSizeKindHelper.GetIconSize(folderSettings.LayoutMode);
 			var returnIconOnly = UserSettingsService.FoldersSettingsService.ShowThumbnails == false || thumbnailSize < 48;
 
+			// Cloud-backed locations are observed, and in Protect mode never asked for an uncached thumbnail (that reads file content)
+			var cloudOperation = await ClassifyThumbnailRequestAsync(item, cancellationToken);
+			var cachedOnlyPolicy = cloudOperation is not null
+				&& cloudTelemetry.Mode == CloudOptimizationMode.Protect
+				&& cloudOperation.Location.HasHydrationRisk;
+
 			byte[]? result = null;
 
 			// Non-cached thumbnails take longer to generate
@@ -1442,6 +1452,7 @@ namespace Files.App.ViewModels
 				if (!returnIconOnly)
 				{
 					// Get cached thumbnail
+					var started = Stopwatch.GetTimestamp();
 					result = await FileThumbnailHelper.GetIconAsync(
 							item.ItemPath,
 							thumbnailSize,
@@ -1449,7 +1460,17 @@ namespace Files.App.ViewModels
 							IconOptions.ReturnThumbnailOnly | IconOptions.ReturnOnlyIfCached);
 
 					cancellationToken.ThrowIfCancellationRequested();
-					loadNonCachedThumbnail = true;
+
+					if (cloudOperation is not null)
+					{
+						var thumbnail = result is not null ? CloudThumbnailResult.CacheHit
+							: cachedOnlyPolicy ? CloudThumbnailResult.GenericFallback
+							: CloudThumbnailResult.CacheMiss;
+						cloudTelemetry.RecordDecision(new(cloudOperation, cachedOnlyPolicy ? CloudPolicyDecisionKind.CachedOnly : CloudPolicyDecisionKind.Observed));
+						cloudTelemetry.RecordResult(new(cloudOperation, CloudOperationOutcome.Success, Stopwatch.GetElapsedTime(started), thumbnail));
+					}
+
+					loadNonCachedThumbnail = !cachedOnlyPolicy;
 				}
 
 				// Skip the per-item icon fetch when the preloaded per-extension icon cannot differ from the final icon
@@ -1483,12 +1504,18 @@ namespace Files.App.ViewModels
 			}
 			else
 			{
-				// Get icon or thumbnail
+				// Get icon or thumbnail; executables on protected cloud locations get the icon only, since the shell would read the file for its thumbnail
 				result = await FileThumbnailHelper.GetIconAsync(
 						item.ItemPath,
 						thumbnailSize,
 						item.IsFolder,
-						(returnIconOnly ? IconOptions.ReturnIconOnly : IconOptions.None));
+						(returnIconOnly || cachedOnlyPolicy ? IconOptions.ReturnIconOnly : IconOptions.None));
+
+				if (cloudOperation is not null && !returnIconOnly)
+				{
+					cloudTelemetry.RecordDecision(new(cloudOperation, cachedOnlyPolicy ? CloudPolicyDecisionKind.CachedOnly : CloudPolicyDecisionKind.Observed));
+					cloudTelemetry.RecordResult(new(cloudOperation, CloudOperationOutcome.Success, TimeSpan.Zero, cachedOnlyPolicy ? CloudThumbnailResult.GenericFallback : CloudThumbnailResult.NotApplicable));
+				}
 
 				cancellationToken.ThrowIfCancellationRequested();
 			}
@@ -1525,6 +1552,7 @@ namespace Files.App.ViewModels
 				_ = Task.Run(async () =>
 				{
 					await loadThumbnailSemaphore.WaitAsync(cancellationToken);
+					var started = Stopwatch.GetTimestamp();
 					try
 					{
 						result = await FileThumbnailHelper.GetIconAsync(
@@ -1537,6 +1565,10 @@ namespace Files.App.ViewModels
 					{
 						loadThumbnailSemaphore.Release();
 					}
+
+					// Observe mode only: this is the request that hydrates content on a cloud drive
+					if (cloudOperation is not null)
+						cloudTelemetry.RecordResult(new(cloudOperation with { Origin = CloudAccessOrigin.Background }, result is not null ? CloudOperationOutcome.Success : CloudOperationOutcome.Failure, Stopwatch.GetElapsedTime(started)));
 
 					cancellationToken.ThrowIfCancellationRequested();
 
@@ -1594,6 +1626,36 @@ namespace Files.App.ViewModels
 						}, Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal);
 					}
 				}, cancellationToken);
+			}
+		}
+
+		/// <summary>
+		/// Describes a thumbnail request for telemetry when the item lives on a cloud-backed location; null for local items or when the mode is Off.
+		/// </summary>
+		private async ValueTask<CloudInteractionOperation?> ClassifyThumbnailRequestAsync(ListedItem item, CancellationToken cancellationToken)
+		{
+			if (cloudTelemetry.Mode == CloudOptimizationMode.Off || item.ItemPath is null)
+				return null;
+
+			try
+			{
+				var location = await cloudLocationClassifier.ClassifyAsync(item.ItemPath, cancellationToken);
+				if (!location.IsCloudBacked)
+					return null;
+
+				return new(
+					CloudOperationName.RequestThumbnail,
+					CloudAccessOrigin.VisibleItem,
+					location,
+					IsExplicit: false,
+					FileSize: item.IsFolder ? null : item.FileSizeBytes,
+					Extension: item.FileExtension);
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				// Classification must never affect rendering; treat as local
+				App.Logger.LogDebug(ex, "Cloud location classification failed for a thumbnail request.");
+				return null;
 			}
 		}
 
