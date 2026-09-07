@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Media;
 using System.Collections.Concurrent;
 using System.IO;
 using Windows.Storage;
+using Files.Shared.Cloud;
 
 namespace Files.App.Services.Settings
 {
@@ -40,6 +41,7 @@ namespace Files.App.Services.Settings
 	[JsonSerializable(typeof(CardsViewSizeKind))]
 	[JsonSerializable(typeof(GridViewSizeKind))]
 	[JsonSerializable(typeof(ColumnsViewSizeKind))]
+	[JsonSerializable(typeof(CloudOptimizationMode))]
 	internal sealed partial class UserSettingsJsonSerializationContext : JsonSerializerContext
 	{
 	}

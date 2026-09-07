@@ -160,6 +160,9 @@ namespace Files.App
 				if (AppLifecycleHelper.AppEnvironment is not AppEnvironment.Dev)
 					AppLifecycleHelper.ConfigureSentry();
 
+				// Start cloud telemetry export; no-op unless Observe/Protect mode with telemetry enabled
+				Ioc.Default.GetRequiredService<Services.Cloud.CloudTelemetryExportHost>().Start();
+
 				var userSettingsService = Ioc.Default.GetRequiredService<IUserSettingsService>();
 				var isLeaveAppRunning = userSettingsService.GeneralSettingsService.LeaveAppRunning;
 
@@ -405,6 +408,9 @@ namespace Files.App
 					}
 				}
 			}
+
+			// Flush and stop cloud telemetry export; the parked (LeaveAppRunning) path keeps exporting
+			Ioc.Default.GetRequiredService<Services.Cloud.CloudTelemetryExportHost>().Dispose();
 
 			// Stop the tray icon's hidden window before continuing teardown so a late "Quit"
 			// click can't dispatch into OnQuitClicked once Application.Current is null.

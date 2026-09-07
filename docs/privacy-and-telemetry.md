@@ -41,16 +41,39 @@ All exported telemetry uses normalized, coarse-grained buckets or predefined enu
 | `extension_group` | `office`, `pdf`, `image`, `video`, `audio`, `cad`, `bim`, `archive`, `text`, `code`, `shortcut`, `other` |
 | `app.version` | Semantic version string (e.g. `0.1.0-poc`) |
 | `session.id` | Ephemeral UUID generated on app startup |
+| `installation.id` | Random GUID generated once per installation and stored in `user_settings.json`; not derived from hardware or user identity |
 
 ## Control and Configuration
 
+Settings live in the Files `user_settings.json` file under `%LOCALAPPDATA%\Packages\<package>\LocalState\settings\` and are read by `ICloudOptimizationSettingsService`:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `Mode` | `Off` | `Off`, `Observe`, or `Protect` |
+| `TelemetryEnabled` | `false` | Export to the collector. Opt-in. No effect when `Mode` is `Off` |
+| `TelemetryEndpoint` | `http://localhost:4318` | OTLP/HTTP endpoint. Non-loopback endpoints are refused by the export host and HTTP redirects are never followed |
+| `EgnyteConfiguredRoots` | `[]` | Administrator override roots treated as Egnyte; empty means automatic detection |
+| `InstallationId` | generated | Random identifier; delete the key to rotate it |
+
+The environment variable `FILES_CLOUD_GUARD_MODE` (`Off`/`Observe`/`Protect`) overrides `Mode` for the process lifetime. This is intended for development and controlled tests.
+
 1. **Operating Modes**:
-   - `Off`: Telemetry is completely disabled. No spans, metrics, or logs are created.
-   - `Observe`: Default Files behavior; telemetry recorded.
-   - `Protect`: Protective behaviors active; telemetry recorded.
-2. **Collector Unavailability**:
-   - The telemetry pipeline uses non-blocking, bounded in-memory buffers.
-   - If the collector is unreachable or missing, batches are dropped silently without impacting UI or file operations.
-3. **Local Pilot Privacy**:
-   - In distributed pilot builds, telemetry is strictly opt-in.
-   - All telemetry endpoints point to local development collectors (`http://localhost:4318` or `4317`) unless explicitly configured.
+   - `Off`: No spans or measurements are created. The exporter is not started.
+   - `Observe`: Stock Files behavior; cloud-backed interactions are recorded.
+   - `Protect`: Interactions and policy decisions are recorded. Enforcement is not implemented yet; behavior currently matches `Observe`.
+2. **What is recorded**: only operations whose location classifies as cloud-backed (`IsCloudBacked`). Local disks and standard network shares produce no telemetry.
+3. **Collector Unavailability**: recording uses bounded in-memory batching (queue 2048 spans, 2 s export timeout, 10 s metric interval). An unreachable collector drops data silently; the UI and file operations are never blocked.
+4. **Failure isolation**: telemetry recording errors are swallowed and logged at most five times per process as a warning that contains only the exception type name.
+
+## Retention and Deletion
+
+- Files itself retains no telemetry. Data exists only in the local collector and its backends under `ops/observability/` (see #5); deleting those containers and volumes deletes all telemetry.
+- Application logs (`debug.log`) may contain the warning described above but never telemetry payloads.
+- To disable completely: set `Mode` to `Off` (or `TelemetryEnabled` to `false`) and restart Files. To rotate the installation identifier, remove `InstallationId` from `user_settings.json`.
+
+## Known Limitations
+
+- Only Files-owned activity is observed. Windows Search, Defender, EDR, DLP, backup agents, Office recent-file handlers, Explorer, and other applications are invisible to this telemetry.
+- Mode changes apply to recording immediately, but export start/stop is evaluated at launch; restart Files after changing `TelemetryEnabled` or `TelemetryEndpoint`.
+- Path-correlation tokens (HMAC of normalized paths) are not implemented in the POC.
+- Export to the loopback collector is plaintext OTLP/HTTP without collector authentication. Any process running as the same user can listen on the configured port; enable `TelemetryEnabled` only on machines where the local collector (#5) is trusted. Authenticated transport is deferred until the collector defines certificate provisioning.
