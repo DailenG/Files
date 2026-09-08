@@ -71,6 +71,9 @@ Restart the app. `%LOCALAPPDATA%\Packages\FilesCloudGuard_<hash>\LocalState\debu
 1. Work normally for a few days in `Observe`. Browse the folders that feel slow, with the layout and Preview pane you would normally use.
 2. Switch to `Protect` and repeat the same kind of work.
 3. Report anything that looks wrong: a thumbnail that should have appeared, a preview that would not load after clicking the button, or a slowdown.
+4. Once a day, confirm the pilot is actually producing data: on the LAN or VPN open **Files Cloud Guard: Observe vs Protect** in SigNoz (`http://pes-dev.pes.local:8080`) and read **Devices reporting** and **Mode per device**. Devices reporting should equal the number of pilot machines that are switched on, and Mode per device should show which one is on `Observe`, which is on `Protect`, and the build each runs.
+
+A live app reports every 10 s whether or not anyone touches a cloud location, so Devices reporting at the expected number with no cloud activity means nobody has browsed a classified location yet, while a machine missing from it is not exporting at all: app closed, off network, `"TelemetryEnabled": false`, or `"Mode": "Off"`, which switches export off entirely. Troubleshooting is in `ops/observability/README.md`.
 
 Telemetry only leaves the machine while it is on the corporate network or VPN; `otel.pesengineers.dev` resolves to a private address. Nothing is queued to disk, so off-network periods simply record nothing.
 

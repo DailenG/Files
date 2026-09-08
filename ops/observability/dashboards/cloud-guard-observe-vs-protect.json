@@ -89,6 +89,51 @@
       "i": "a83b3d0f-12ef-4c03-b6eb-3ad327ab20cc",
       "moved": false,
       "static": false
+    },
+    {
+      "h": 3,
+      "w": 4,
+      "x": 0,
+      "y": 15,
+      "i": "9ca770f7-c500-482f-846a-ee4f749ba81d",
+      "moved": false,
+      "static": false
+    },
+    {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 18,
+      "i": "8afc6d4c-a2ad-4ac9-8825-d1580d35ea1e",
+      "moved": false,
+      "static": false
+    },
+    {
+      "h": 3,
+      "w": 8,
+      "x": 4,
+      "y": 15,
+      "i": "b9a4db2a-5845-48db-a823-c35f0d9c8e9c",
+      "moved": false,
+      "static": false
+    },
+    {
+      "h": 4,
+      "w": 6,
+      "x": 6,
+      "y": 18,
+      "i": "fdf8455f-a840-428e-8c23-7889efe795c5",
+      "moved": false,
+      "static": false
+    },
+    {
+      "h": 4,
+      "w": 6,
+      "x": 0,
+      "y": 22,
+      "i": "34a40354-de20-4e16-b253-b55771f9a050",
+      "moved": false,
+      "static": false
     }
   ],
   "variables": {
@@ -101,7 +146,7 @@
       "multiSelect": true,
       "name": "mode",
       "order": 0,
-      "queryValue": "SELECT JSONExtractString(labels, 'optimization.mode') AS `mode`\nFROM signoz_metrics.time_series_v4_1day\nWHERE metric_name = 'files.cloud.operations'\nGROUP BY `mode`",
+      "queryValue": "SELECT JSONExtractString(labels, 'optimization.mode') AS `mode`\nFROM signoz_metrics.time_series_v4_1day\nWHERE metric_name = 'files.cloud.heartbeat'\nGROUP BY `mode`",
       "selectedValue": "",
       "showALLOption": true,
       "sort": "DISABLED",
@@ -120,6 +165,22 @@
       "queryValue": "SELECT JSONExtractString(labels, 'provider.kind') AS `provider`\nFROM signoz_metrics.time_series_v4_1day\nWHERE metric_name = 'files.cloud.operations'\nGROUP BY `provider`",
       "selectedValue": "egnyte",
       "showALLOption": false,
+      "sort": "DISABLED",
+      "textboxValue": "",
+      "type": "QUERY"
+    },
+    "a35fc17f-cff6-4abb-82e5-8ed238afe673": {
+      "allSelected": true,
+      "customValue": "",
+      "description": "",
+      "id": "a35fc17f-cff6-4abb-82e5-8ed238afe673",
+      "modificationUUID": "29a860b2-9171-464d-a923-3515f3723888",
+      "multiSelect": true,
+      "name": "device",
+      "order": 0,
+      "queryValue": "SELECT JSONExtractString(labels, 'installation.id') AS `device`\nFROM signoz_metrics.time_series_v4_1day\nWHERE metric_name = 'files.cloud.heartbeat'\nGROUP BY `device`",
+      "selectedValue": "",
+      "showALLOption": true,
       "sort": "DISABLED",
       "textboxValue": "",
       "type": "QUERY"
@@ -991,6 +1052,436 @@
               ],
               "filter": {
                 "expression": "provider.kind = $provider AND optimization.mode IN $mode"
+              }
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "9ca770f7-c500-482f-846a-ee4f749ba81d",
+      "title": "Devices reporting",
+      "description": "Devices whose export host is alive right now. files.cloud.heartbeat is always 1, so the sum of the latest heartbeat across series is the device count. Not filtered by mode or provider, so it stays meaningful before any cloud activity exists.",
+      "panelTypes": "value",
+      "yAxisUnit": "none",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "query": {
+        "id": "2a217af2-c446-4490-b641-a3cd56f23c8a",
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "functions": [],
+              "groupBy": [],
+              "having": {
+                "expression": ""
+              },
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.heartbeat",
+                  "temporality": null,
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "last"
+                }
+              ],
+              "filter": {
+                "expression": "installation.id IN $device"
+              }
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "8afc6d4c-a2ad-4ac9-8825-d1580d35ea1e",
+      "title": "Device liveness",
+      "description": "One flat line per device at 1 while it is reporting. A gap is a device that stopped exporting: app closed, machine off network, or Mode set to Off.",
+      "panelTypes": "graph",
+      "yAxisUnit": "none",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "query": {
+        "id": "b3063005-38fd-42f6-9f8a-36d0700fabf0",
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "installation.id",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "installation.id--string--tag--false"
+                },
+                {
+                  "key": "optimization.mode",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "optimization.mode--string--tag--false"
+                }
+              ],
+              "having": {
+                "expression": ""
+              },
+              "legend": "{{installation.id}} - {{optimization.mode}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.heartbeat",
+                  "temporality": null,
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "max",
+                  "reduceTo": "last"
+                }
+              ],
+              "filter": {
+                "expression": "installation.id IN $device AND optimization.mode IN $mode"
+              }
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "b9a4db2a-5845-48db-a823-c35f0d9c8e9c",
+      "title": "Mode per device",
+      "description": "Current mode and build per device: which install is the Observe baseline, which is Protect. Deliberately not filtered by $mode, since hiding a mode would hide what this panel reports.",
+      "panelTypes": "table",
+      "yAxisUnit": "none",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "query": {
+        "id": "93db2206-5819-4792-bbdf-336ede5d8e84",
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "installation.id",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "installation.id--string--tag--false"
+                },
+                {
+                  "key": "optimization.mode",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "optimization.mode--string--tag--false"
+                },
+                {
+                  "key": "app.version",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "app.version--string--tag--false"
+                }
+              ],
+              "having": {
+                "expression": ""
+              },
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.heartbeat",
+                  "temporality": null,
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "max",
+                  "reduceTo": "last"
+                }
+              ],
+              "filter": {
+                "expression": "installation.id IN $device"
+              }
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "fdf8455f-a840-428e-8c23-7889efe795c5",
+      "title": "Session uptime",
+      "description": "Seconds since each export host started. A sawtooth reset means the app restarted or crashed.",
+      "panelTypes": "graph",
+      "yAxisUnit": "s",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "query": {
+        "id": "e8d7619f-9f59-4cd7-99a6-c135c6b14dd8",
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "installation.id",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "installation.id--string--tag--false"
+                }
+              ],
+              "having": {
+                "expression": ""
+              },
+              "legend": "{{installation.id}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.session.uptime",
+                  "temporality": null,
+                  "timeAggregation": "latest",
+                  "spaceAggregation": "max",
+                  "reduceTo": "last"
+                }
+              ],
+              "filter": {
+                "expression": "installation.id IN $device"
+              }
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "34a40354-de20-4e16-b253-b55771f9a050",
+      "title": "Cloud activity per device",
+      "description": "Cloud interactions per device. Zero here while Devices reporting is non-zero means the agents are healthy and nobody has visited a classified cloud location.",
+      "panelTypes": "graph",
+      "yAxisUnit": "none",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "selectedLogFields": [],
+      "selectedTracesFields": [],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "query": {
+        "id": "37a70a5c-7687-4b81-be18-12c4e5766be8",
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "functions": [],
+              "groupBy": [
+                {
+                  "key": "installation.id",
+                  "dataType": "string",
+                  "type": "tag",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "id": "installation.id--string--tag--false"
+                }
+              ],
+              "having": {
+                "expression": ""
+              },
+              "legend": "{{installation.id}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "stepInterval": 60,
+              "aggregations": [
+                {
+                  "metricName": "files.cloud.operations",
+                  "temporality": null,
+                  "timeAggregation": "increase",
+                  "spaceAggregation": "sum",
+                  "reduceTo": "sum"
+                }
+              ],
+              "filter": {
+                "expression": "provider.kind = $provider AND optimization.mode IN $mode AND installation.id IN $device"
               }
             }
           ],

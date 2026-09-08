@@ -107,7 +107,7 @@ ssh root@pes-dev.pes.local "D=/mnt/user/appdata/signoz-aio/signoz/signoz.db; \
   WHERE name = 'Files Cloud Guard: Observe vs Protect'\"; rm /tmp/d.json"
 ```
 
-Two variables drive every panel: `mode` (multi-select over `optimization.mode`) and `provider` (defaults to `egnyte`). Panels:
+Three variables drive the panels: `mode` (multi-select over `optimization.mode`), `provider` (defaults to `egnyte`) and `device` (multi-select over `installation.id`, ALL by default). Panels:
 
 | Panel | Reads |
 |---|---|
@@ -118,6 +118,19 @@ Two variables drive every panel: `mode` (multi-select over `optimization.mode`) 
 | Operations by type and origin | `files.cloud.operations` by `operation.name` and `access.origin` |
 | Operation duration p95 | `files.cloud.operation.duration` by `operation.name` and mode |
 | Three totals | background requests, generic fallbacks, failures |
+| Devices reporting | `files.cloud.heartbeat`, sum of the latest value across reporting series. This is the fleet size that is alive right now |
+| Device liveness | `files.cloud.heartbeat` by `installation.id` and `optimization.mode`. A gap in a line is a device that stopped exporting |
+| Mode per device | `files.cloud.heartbeat` as a table by `installation.id`, `optimization.mode`, `app.version`: which install is the Observe baseline, which is Protect, and which build each runs |
+| Session uptime | `files.cloud.session.uptime` by `installation.id`. A sawtooth reset means the app restarted or crashed |
+| Cloud activity per device | `files.cloud.operations` by `installation.id`, honouring `provider`, `mode` and `device`. Zero here while Devices reporting is not zero means the agents are healthy and nobody has visited a classified cloud location |
+
+`files.cloud.heartbeat` (always `1`) and `files.cloud.session.uptime` are the liveness signal. Both are observable gauges exported every 10 s for the whole lifetime of the process whenever export is active, independently of whether anyone ever opens a cloud location, so an empty interaction panel next to a non-zero **Devices reporting** means "no usage", not "dead agent". They carry `optimization.mode` but no `provider.kind`, so the fleet panels must never filter on `$provider`; such a filter would make them permanently empty. `Mode: Off` disables export altogether, so an `Off` device is by design indistinguishable from a powered-off one.
+
+The `mode` variable is sourced from `files.cloud.heartbeat` rather than `files.cloud.operations` so that it is populated as soon as a device reports, not only once someone touches a cloud path. `provider` still comes from `files.cloud.operations` and is therefore empty until there is real cloud activity, which is why Devices reporting, Mode per device and Session uptime do not filter on it.
+
+`Operations by type and origin` also covers the two operations that exist purely for baseline evidence: `enumerate_directory` (one record per navigation to a classified folder, `item_count_bucket` = items enumerated) and `calculate_folder_size` (one record per enumeration that triggered recursive sizing, `item_count_bucket` = folders queued for a size walk). Both are always `policy.decision = observed`; nothing guards them yet. They are the input for issues #10 and #11.
+
+One assumption behind these panels is **unverified against the live instance**: that SigNoz surfaces the OTel resource attributes as queryable metric attributes under their plain names, `installation.id` and `app.version`. That is its documented behaviour for metrics, but it has not been confirmed here. If the fleet panels are empty while the interaction panels have data, check this first: open any `files.cloud.heartbeat` query in the builder and look at the attribute-key suggestions, or run `SELECT DISTINCT labels FROM signoz_metrics.time_series_v4_1day WHERE metric_name = 'files.cloud.heartbeat' LIMIT 5` in ClickHouse. If the keys are prefixed or dropped, the `groupBy` keys, the panel filters and the `device` variable query all need the real key names.
 
 The schema is version specific. After editing panels in the UI, export the JSON and replace the file here rather than hand-editing it.
 
@@ -128,6 +141,7 @@ The schema is version specific. After editing panels in the UI, export the JSON 
 | `otel-ingress` restart loop, log says `API token ... appears invalid` | `CF_API_TOKEN` in `.env` is wrong or still the placeholder |
 | `Cloud telemetry export skipped: endpoint is missing, or is neither loopback nor https.` | `TelemetryEndpoint` must be `https://` for any non-localhost host |
 | Nothing in SigNoz, no warnings in `debug.log` | `curl` tests above; `401` means the vault token differs from `INGEST_TOKEN` |
+| Interaction panels are empty | Read **Devices reporting** first. `0`: nothing is exporting, so the app is not running, `TelemetryEnabled` is false, `Mode` is `Off` (which disables export entirely), or the endpoint is rejecting the export; work down the endpoint and token rows above and check **Device liveness** for when each device last reported. `2` (the pilot fleet size) with **Cloud activity per device** at zero: both agents are healthy and nobody has visited a classified cloud location yet, which is a usage question, not a plumbing one. Non-zero activity but empty fleet panels: the resource-attribute assumption in section 8 |
 | Certificate errors on the client | `./deploy.sh status` shows no cert: DNS-01 failed. Check token scope, and that `otel.pesengineers.dev` still resolves publicly (the TXT challenge is written to the public zone) |
 | Data appears from an off-site machine | it resolved and reached `192.168.76.42`, so it is on VPN; expected |
 | ClickHouse disk growth | retention in **Settings > General**; the AIO container has no separate TTL knob |

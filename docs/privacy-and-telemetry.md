@@ -28,8 +28,8 @@ All exported telemetry uses normalized, coarse-grained buckets or predefined enu
 |---|---|
 | `provider.kind` | `egnyte`, `local`, `standard_network`, `other_cloud`, `unknown` |
 | `optimization.mode` | `off`, `observe`, `protect` |
-| `operation.name` | `navigate`, `enumerate_directory`, `request_thumbnail`, `request_preview`, `read_basic_metadata`, `search`, `open_file` |
-| `access.origin` | `navigation`, `folder_display`, `visible_item`, `selection_changed`, `hover`, `restored_tab`, `explicit_button` |
+| `operation.name` | `navigate`, `enumerate_directory`, `request_thumbnail`, `request_preview`, `read_basic_metadata`, `search`, `calculate_folder_size`, `open_file` |
+| `access.origin` | `navigation`, `folder_display`, `visible_item`, `selection_changed`, `hover`, `background`, `restored_tab`, `explicit_button` |
 | `access.is_explicit` | `true`, `false` |
 | `policy.decision` | `allowed`, `observed`, `cached_only`, `deferred`, `generic_fallback`, `redirected`, `blocked`, `not_applicable` |
 | `operation.outcome` | `success`, `failure`, `cancelled` |
@@ -62,9 +62,10 @@ The environment variable `FILES_CLOUD_GUARD_MODE` (`Off`/`Observe`/`Protect`) ov
    - `Off`: No spans or measurements are created. The exporter is not started.
    - `Observe`: Stock Files behavior; cloud-backed interactions are recorded.
    - `Protect`: Interactions and policy decisions are recorded, and enforcement is applied on hydration-risk locations: cached-only thumbnails, deferred previews, and current-folder-only search.
-2. **What is recorded**: only operations whose location classifies as cloud-backed (`IsCloudBacked`). Local disks and standard network shares produce no telemetry.
-3. **Collector Unavailability**: recording uses bounded in-memory batching (queue 2048 spans, 2 s export timeout, 10 s metric interval). An unreachable collector drops data silently; nothing is spooled to disk, so a machine that cannot reach the internal collector (for example, off the corporate network) exports nothing. The UI and file operations are never blocked.
-4. **Failure isolation**: telemetry recording errors are swallowed and logged at most five times per process as a warning that contains only the exception type name.
+2. **What is recorded**: only operations whose location classifies as cloud-backed (`IsCloudBacked`). Local disks and standard network shares produce no telemetry. The two liveness gauges below are the sole exception: they describe the process, not a location.
+3. **Liveness**: `files.cloud.heartbeat` (constant `1`) and `files.cloud.session.uptime` (seconds since telemetry started) are observed on every 10 s export interval for as long as the process runs, carrying only `optimization.mode` plus the resource attributes. They exist so that an empty dashboard can be distinguished from an agent that is not reporting, and they carry no path, location, or activity information. `Mode: Off` starts no exporter, so an `Off` install emits nothing at all, including these.
+4. **Collector Unavailability**: recording uses bounded in-memory batching (queue 2048 spans, 2 s export timeout, 10 s metric interval). An unreachable collector drops data silently; nothing is spooled to disk, so a machine that cannot reach the internal collector (for example, off the corporate network) exports nothing. The UI and file operations are never blocked.
+5. **Failure isolation**: telemetry recording errors are swallowed and logged at most five times per process as a warning that contains only the exception type name.
 
 ## Retention and Deletion
 

@@ -28,6 +28,7 @@ namespace Files.Shared.Cloud
 		private readonly Counter<long> _previewDeferred;
 		private readonly Counter<long> _previewExplicitLoads;
 		private readonly Counter<long> _failures;
+		private readonly long _startedTimestamp = Stopwatch.GetTimestamp();
 		private int _internalErrorsLogged;
 
 		public CloudInteractionTelemetry(Func<CloudOptimizationMode> modeProvider, ILogger? logger = null)
@@ -43,6 +44,11 @@ namespace Files.Shared.Cloud
 			_previewDeferred = _meter.CreateCounter<long>("files.cloud.preview.deferred", "{preview}");
 			_previewExplicitLoads = _meter.CreateCounter<long>("files.cloud.preview.explicit_loads", "{preview}");
 			_failures = _meter.CreateCounter<long>("files.cloud.failures", "{operation}");
+
+			// Liveness: these are observed on every export interval regardless of user activity, so an
+			// empty interaction panel can be told apart from an agent that is not reporting at all.
+			_ = _meter.CreateObservableGauge("files.cloud.heartbeat", ObserveHeartbeat, "{app}", "Always 1 while cloud telemetry is exporting.");
+			_ = _meter.CreateObservableGauge("files.cloud.session.uptime", ObserveUptime, "s", "Seconds since cloud telemetry started in this process.");
 		}
 
 		/// <inheritdoc/>
@@ -157,6 +163,18 @@ namespace Files.Shared.Cloud
 			_activitySource.Dispose();
 			_meter.Dispose();
 		}
+
+		/// <summary>
+		/// Reports that this install is alive. The mode is re-read on every observation so a mid-session
+		/// change, including a switch to Off, is visible without waiting for the next interaction.
+		/// </summary>
+		private Measurement<int> ObserveHeartbeat() => new(1, ModeTag());
+
+		private Measurement<double> ObserveUptime()
+			=> new(Stopwatch.GetElapsedTime(_startedTimestamp).TotalSeconds, ModeTag());
+
+		private KeyValuePair<string, object?>[] ModeTag()
+			=> [new(CloudTelemetryAttributes.OptimizationMode, CloudTelemetryAttributes.Mode(Mode))];
 
 		private bool ShouldRecord(CloudInteractionOperation operation, out CloudOptimizationMode mode)
 		{

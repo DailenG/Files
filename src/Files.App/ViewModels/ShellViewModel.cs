@@ -1674,6 +1674,34 @@ namespace Files.App.ViewModels
 			}
 		}
 
+		/// <summary>
+		/// Describes a directory enumeration for telemetry when the folder lives on a cloud-backed location; null for local folders or when the mode is Off.
+		/// </summary>
+		private async ValueTask<CloudInteractionOperation?> ClassifyDirectoryEnumerationAsync(string path, CancellationToken cancellationToken)
+		{
+			if (cloudTelemetry.Mode == CloudOptimizationMode.Off)
+				return null;
+
+			try
+			{
+				var location = await cloudLocationClassifier.ClassifyAsync(path, cancellationToken);
+				if (!location.IsCloudBacked)
+					return null;
+
+				return new(
+					CloudOperationName.EnumerateDirectory,
+					CloudAccessOrigin.Navigation,
+					location,
+					IsExplicit: true);
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				// Classification must never affect navigation; treat as local
+				App.Logger.LogDebug(ex, "Cloud location classification failed for a directory enumeration.");
+				return null;
+			}
+		}
+
 		private static bool HasPerFileIcon(string? extension)
 			=> extension is not null && _perFileIconExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
 
@@ -2202,7 +2230,19 @@ namespace Files.App.ViewModels
 			stopwatch.Start();
 
 			var isRecycleBin = path.StartsWith(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.Ordinal);
+			var cloudOperation = await ClassifyDirectoryEnumerationAsync(path, addFilesCTS.Token);
+			var cloudEnumerationStarted = Stopwatch.GetTimestamp();
 			var enumerated = await EnumerateItemsFromStandardFolderAsync(path, addFilesCTS.Token, library);
+
+			if (cloudOperation is not null)
+			{
+				// Observe only: enumeration itself reads directory metadata, not file content
+				cloudTelemetry.RecordDecision(new(cloudOperation, CloudPolicyDecisionKind.Observed));
+				cloudTelemetry.RecordResult(new(
+					cloudOperation with { ItemCount = filesAndFolders.Count },
+					addFilesCTS.IsCancellationRequested ? CloudOperationOutcome.Cancelled : CloudOperationOutcome.Success,
+					Stopwatch.GetElapsedTime(cloudEnumerationStarted)));
+			}
 
 			// Hide progressbar after enumeration
 			IsLoadingItems = false;

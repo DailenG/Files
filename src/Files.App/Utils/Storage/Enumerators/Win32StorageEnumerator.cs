@@ -2,7 +2,9 @@
 // Licensed under the MIT License.
 
 using Files.App.Services.SizeProvider;
+using Files.Shared.Cloud;
 using Files.Shared.Helpers;
+using Microsoft.Extensions.Logging;
 using System.IO;
 using Windows.Storage;
 using FileAttributes = System.IO.FileAttributes;
@@ -13,6 +15,8 @@ namespace Files.App.Utils.Storage
 	{
 		private static readonly ISizeProvider folderSizeProvider = Ioc.Default.GetRequiredService<ISizeProvider>();
 		private static readonly IStorageCacheService fileListCache = Ioc.Default.GetRequiredService<IStorageCacheService>();
+		private static readonly ICloudLocationClassifier cloudLocationClassifier = Ioc.Default.GetRequiredService<ICloudLocationClassifier>();
+		private static readonly ICloudInteractionTelemetry cloudTelemetry = Ioc.Default.GetRequiredService<ICloudInteractionTelemetry>();
 
 		private static readonly string folderTypeTextLocalized = Strings.Folder.GetLocalizedResource();
 
@@ -44,6 +48,12 @@ namespace Files.App.Utils.Storage
 
 			var isGitRepo = GitHelpers.IsRepositoryEx(path, out var repoPath) && !string.IsNullOrEmpty(await GitHelpers.GetRepositoryHeadName(repoPath));
 			var rawHandle = hFile.DangerousGetHandle();
+
+			// Folder sizing walks the tree recursively; on a cloud-backed root that is a whole-subtree metadata scan
+			var cloudSizeOperation = CalculateFolderSizes
+				? await ClassifyFolderSizeRequestAsync(path, cancellationToken)
+				: null;
+			var cloudSizedFolders = 0;
 
 			try
 			{
@@ -95,6 +105,9 @@ namespace Files.App.Utils.Storage
 										}
 
 										_ = folderSizeProvider.UpdateAsync(folderPath, cancellationToken);
+
+										if (cloudSizeOperation is not null)
+											++cloudSizedFolders;
 									}
 								}
 							}
@@ -122,7 +135,45 @@ namespace Files.App.Utils.Storage
 				hFile.Dispose();
 			}
 
+			if (cloudSizeOperation is not null && cloudSizedFolders > 0)
+			{
+				// The walks are fire-and-forget, so only the request count is meaningful here
+				cloudTelemetry.RecordDecision(new(cloudSizeOperation, CloudPolicyDecisionKind.Observed));
+				cloudTelemetry.RecordResult(new(
+					cloudSizeOperation with { ItemCount = cloudSizedFolders },
+					CloudOperationOutcome.Success,
+					TimeSpan.Zero));
+			}
+
 			return tempList;
+		}
+
+		/// <summary>
+		/// Describes recursive folder sizing for telemetry when the enumerated folder lives on a cloud-backed location; null otherwise.
+		/// </summary>
+		private static async ValueTask<CloudInteractionOperation?> ClassifyFolderSizeRequestAsync(string path, CancellationToken cancellationToken)
+		{
+			if (cloudTelemetry.Mode == CloudOptimizationMode.Off)
+				return null;
+
+			try
+			{
+				var location = await cloudLocationClassifier.ClassifyAsync(path, cancellationToken);
+				if (!location.IsCloudBacked)
+					return null;
+
+				return new(
+					CloudOperationName.CalculateFolderSize,
+					CloudAccessOrigin.Background,
+					location,
+					IsExplicit: false);
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				// Classification must never affect enumeration; treat as local
+				App.Logger.LogDebug(ex, "Cloud location classification failed for recursive folder sizing.");
+				return null;
+			}
 		}
 
 		private static IEnumerable<ListedItem> EnumAdsForPath(string itemPath, ListedItem main)

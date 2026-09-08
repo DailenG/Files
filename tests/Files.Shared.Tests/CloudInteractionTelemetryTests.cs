@@ -20,7 +20,7 @@ namespace Files.Shared.Tests.Cloud
 
 		private sealed class Capture : IDisposable
 		{
-			public readonly List<(string Instrument, long Value, Dictionary<string, object?> Tags)> Measurements = [];
+			public readonly List<(string Instrument, double Value, Dictionary<string, object?> Tags)> Measurements = [];
 			public readonly List<Activity> Activities = [];
 			private readonly MeterListener _meterListener = new();
 			private readonly ActivityListener _activityListener;
@@ -33,6 +33,10 @@ namespace Files.Shared.Tests.Cloud
 						listener.EnableMeasurementEvents(instrument);
 				};
 				_meterListener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
+					Measurements.Add((instrument.Name, value, tags.ToArray().ToDictionary(t => t.Key, t => t.Value))));
+				_meterListener.SetMeasurementEventCallback<int>((instrument, value, tags, _) =>
+					Measurements.Add((instrument.Name, value, tags.ToArray().ToDictionary(t => t.Key, t => t.Value))));
+				_meterListener.SetMeasurementEventCallback<double>((instrument, value, tags, _) =>
 					Measurements.Add((instrument.Name, value, tags.ToArray().ToDictionary(t => t.Key, t => t.Value))));
 				_meterListener.Start();
 
@@ -50,6 +54,11 @@ namespace Files.Shared.Tests.Cloud
 				_meterListener.Dispose();
 				_activityListener.Dispose();
 			}
+
+			/// <summary>
+			/// Pulls the observable instruments, the way an exporter does on its interval.
+			/// </summary>
+			public void RecordObservableInstruments() => _meterListener.RecordObservableInstruments();
 		}
 
 		[TestMethod]
@@ -139,6 +148,31 @@ namespace Files.Shared.Tests.Cloud
 		{
 			using var telemetry = new CloudInteractionTelemetry(() => throw new InvalidOperationException());
 			Assert.AreEqual(CloudOptimizationMode.Off, telemetry.Mode);
+		}
+
+		[TestMethod]
+		public void Liveness_IsReportedWithoutAnyInteraction_AndFollowsTheCurrentMode()
+		{
+			var mode = CloudOptimizationMode.Observe;
+			using var capture = new Capture();
+			using var telemetry = new CloudInteractionTelemetry(() => mode);
+
+			// No operation is ever recorded: this is the "deployed but unused" case the dashboard must distinguish
+			capture.RecordObservableInstruments();
+
+			var heartbeat = capture.Measurements.Single(m => m.Instrument == "files.cloud.heartbeat");
+			Assert.AreEqual(1d, heartbeat.Value);
+			Assert.AreEqual("observe", heartbeat.Tags[CloudTelemetryAttributes.OptimizationMode]);
+			Assert.IsTrue(capture.Measurements.Any(m => m.Instrument == "files.cloud.session.uptime"));
+
+			// A mid-session mode change must be visible on the next interval without waiting for an interaction
+			mode = CloudOptimizationMode.Protect;
+			capture.Measurements.Clear();
+			capture.RecordObservableInstruments();
+
+			Assert.AreEqual(
+				"protect",
+				capture.Measurements.Single(m => m.Instrument == "files.cloud.heartbeat").Tags[CloudTelemetryAttributes.OptimizationMode]);
 		}
 
 		[TestMethod]
