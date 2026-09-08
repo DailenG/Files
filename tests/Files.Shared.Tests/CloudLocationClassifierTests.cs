@@ -114,6 +114,28 @@ namespace Files.Shared.Tests.Cloud
 		}
 
 		[TestMethod]
+		public async Task ClassifyAsync_ConfiguredRootItself_ReturnsEgnyte()
+		{
+			var classifier = new CloudLocationClassifier(configuredEgnyteRoots: new[] { @"C:\Egnyte\Shared" });
+
+			var withoutSeparator = await classifier.ClassifyAsync(@"C:\Egnyte\Shared");
+			var withSeparator = await classifier.ClassifyAsync(@"C:\Egnyte\Shared\");
+
+			Assert.AreEqual(CloudLocationKind.Egnyte, withoutSeparator.Kind);
+			Assert.AreEqual(CloudLocationKind.Egnyte, withSeparator.Kind);
+		}
+
+		[TestMethod]
+		public async Task ClassifyAsync_SiblingOfConfiguredRootWithSharedPrefix_ReturnsLocal()
+		{
+			var classifier = new CloudLocationClassifier(configuredEgnyteRoots: new[] { @"C:\Egnyte\Shared" });
+
+			var result = await classifier.ClassifyAsync(@"C:\Egnyte\SharedArchive\Plan.pdf");
+
+			Assert.AreEqual(CloudLocationKind.Local, result.Kind);
+		}
+
+		[TestMethod]
 		public async Task ClassifyAsync_EmptyOrNull_ReturnsUnknown()
 		{
 			var classifier = new CloudLocationClassifier();

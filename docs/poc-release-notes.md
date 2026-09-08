@@ -10,9 +10,11 @@ Navigating a virtual cloud filesystem such as the Egnyte Desktop App can downloa
 
 Three modes:
 
-- **Off** (default) — stock Files. Nothing is classified, measured or changed.
+- **Off** — stock Files. Nothing is classified, measured or changed.
 - **Observe** — stock behaviour, plus measurement of how much hydration is happening.
-- **Protect** — on cloud-backed locations: thumbnails come from the shell cache only and uncached items keep their type icon; the Preview pane shows a metadata card with a **Load full preview** button instead of reading the file on selection.
+- **Protect** — on cloud-backed locations: thumbnails come from the shell cache only and uncached items keep their type icon; the Preview pane shows a metadata card with a **Load full preview** button instead of reading the file on selection; search covers the current folder only, with a **Search all subfolders** button for the deep search.
+
+Release builds ship in **Observe** by default, with the collector endpoint and ingest token compiled in. Change the mode in `user_settings.json`, or per process with `FILES_CLOUD_GUARD_MODE`.
 
 Local disks and ordinary SMB shares behave exactly as stock Files in all three modes.
 
@@ -38,7 +40,7 @@ See `pilot-runbook.md`, included as a release asset.
 ## Known limitations
 
 - Uncached thumbnails on protected cloud locations show type icons instead of image previews.
-- Cloud files need one click in the Preview pane in Protect mode.
+- Cloud files need one click in the Preview pane in Protect mode, and search on them stays in the current folder until **Search all subfolders** is clicked.
 - Only Egnyte is classified as a hydration-risk provider.
 - Only Files' own activity is measured; other processes on the machine are invisible to it.
 - No self-update. New builds are installed from a new release.

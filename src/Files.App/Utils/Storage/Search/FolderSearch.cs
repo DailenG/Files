@@ -1,8 +1,10 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Shared.Cloud;
 using Files.Shared.Helpers;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
 using Windows.Storage;
@@ -22,6 +24,8 @@ namespace Files.App.Utils.Storage
 		private readonly IStorageTrashBinService StorageTrashBinService = Ioc.Default.GetRequiredService<IStorageTrashBinService>();
 		private readonly IFileTagsSettingsService fileTagsSettingsService = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();
 		private readonly ILogger logger = Ioc.Default.GetRequiredService<ILogger<FolderSearch>>();
+		private readonly ICloudLocationClassifier cloudLocationClassifier = Ioc.Default.GetRequiredService<ICloudLocationClassifier>();
+		private readonly ICloudInteractionTelemetry cloudTelemetry = Ioc.Default.GetRequiredService<ICloudInteractionTelemetry>();
 
 		private static readonly string folderTypeTextLocalized = Strings.Folder.GetLocalizedResource();
 
@@ -36,6 +40,20 @@ namespace Files.App.Utils.Storage
 		private uint UsedMaxItemCount => MaxItemCount > 0 ? MaxItemCount : uint.MaxValue;
 
 		public EventHandler? SearchTick;
+
+		/// <summary>
+		/// Opts this search into deep recursion on a protected cloud location.
+		/// </summary>
+		public bool AllowDeepCloudSearch { get; set; }
+
+		/// <summary>
+		/// True when the cloud guard restricted this search to the search folder itself.
+		/// </summary>
+		public bool WasLimitedToCurrentFolder { get; private set; }
+
+		private CloudInteractionOperation? cloudOperation;
+
+		private bool restrictToCurrentFolder;
 
 		private bool IsAQSQuery => Query is not null && (Query.StartsWith('$') || Query.Contains(':', StringComparison.Ordinal));
 
@@ -77,28 +95,44 @@ namespace Files.App.Utils.Storage
 
 		public async Task SearchAsync(IList<ListedItem> results, CancellationToken token)
 		{
+			await ApplyCloudGuardAsync(token);
+
+			var started = Stopwatch.GetTimestamp();
+			var outcome = CloudOperationOutcome.Success;
+			var error = CloudErrorCategory.None;
+
 			try
 			{
-				if (App.LibraryManager.TryGetLibrary(Folder, out var library))
-				{
-					await AddItemsForLibraryAsync(library, results, token);
-				}
-				else if (Folder == "Home")
-				{
-					await AddItemsForHomeAsync(results, token);
-				}
-				else
-				{
-					await AddItemsAsync(Folder ?? throw new InvalidOperationException("The search folder has not been set."), results, token);
-				}
+				await DispatchSearchAsync(results, token);
 			}
 			catch (OperationCanceledException)
 			{
-				return;
+				outcome = CloudOperationOutcome.Cancelled;
+				error = CloudErrorCategory.Cancelled;
 			}
 			catch (Exception e)
 			{
+				outcome = CloudOperationOutcome.Failure;
+				error = CloudTelemetryAttributes.Categorize(e);
 				App.Logger.LogWarning(e, "Search failure");
+			}
+
+			RecordSearchResult(results.Count, Stopwatch.GetElapsedTime(started), outcome, error);
+		}
+
+		private async Task DispatchSearchAsync(IList<ListedItem> results, CancellationToken token)
+		{
+			if (App.LibraryManager.TryGetLibrary(Folder, out var library))
+			{
+				await AddItemsForLibraryAsync(library, results, token);
+			}
+			else if (Folder == "Home")
+			{
+				await AddItemsForHomeAsync(results, token);
+			}
+			else
+			{
+				await AddItemsAsync(Folder ?? throw new InvalidOperationException("The search folder has not been set."), results, token);
 			}
 		}
 
@@ -120,28 +154,62 @@ namespace Files.App.Utils.Storage
 		public async Task<ObservableCollection<ListedItem>> SearchAsync()
 		{
 			ObservableCollection<ListedItem> results = [];
+			await SearchAsync(results, CancellationToken.None);
+			return results;
+		}
+
+		/// <summary>
+		/// Classifies the search folder and, in Protect mode, keeps a hydration-prone cloud search out of subfolders.
+		/// </summary>
+		private async Task ApplyCloudGuardAsync(CancellationToken token)
+		{
+			cloudOperation = null;
+			restrictToCurrentFolder = false;
+			WasLimitedToCurrentFolder = false;
+
+			if (cloudTelemetry.Mode == CloudOptimizationMode.Off || string.IsNullOrEmpty(Folder) || Folder == "Home")
+				return;
+
 			try
 			{
-				var token = CancellationToken.None;
-				if (App.LibraryManager.TryGetLibrary(Folder, out var library))
-				{
-					await AddItemsForLibraryAsync(library, results, token);
-				}
-				else if (Folder == "Home")
-				{
-					await AddItemsForHomeAsync(results, token);
-				}
-				else
-				{
-					await AddItemsAsync(Folder ?? throw new InvalidOperationException("The search folder has not been set."), results, token);
-				}
-			}
-			catch (Exception e)
-			{
-				App.Logger.LogWarning(e, "Search failure");
-			}
+				var location = await cloudLocationClassifier.ClassifyAsync(Folder, token);
+				if (!location.IsCloudBacked)
+					return;
 
-			return results;
+				cloudOperation = new(
+					CloudOperationName.Search,
+					CloudAccessOrigin.ExplicitButton,
+					location,
+					IsExplicit: true);
+
+				restrictToCurrentFolder =
+					cloudTelemetry.Mode == CloudOptimizationMode.Protect &&
+					location.HasHydrationRisk &&
+					!AllowDeepCloudSearch;
+
+				WasLimitedToCurrentFolder = restrictToCurrentFolder;
+
+				cloudTelemetry.RecordDecision(new(
+					cloudOperation,
+					restrictToCurrentFolder
+						? CloudPolicyDecisionKind.Redirected
+						: AllowDeepCloudSearch ? CloudPolicyDecisionKind.Allowed : CloudPolicyDecisionKind.Observed));
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				App.Logger.LogDebug(ex, "Cloud location classification failed for a search request.");
+				cloudOperation = null;
+				restrictToCurrentFolder = false;
+				WasLimitedToCurrentFolder = false;
+			}
+		}
+
+		private void RecordSearchResult(int itemCount, TimeSpan duration, CloudOperationOutcome outcome, CloudErrorCategory error)
+		{
+			if (cloudOperation is null)
+				return;
+
+			cloudTelemetry.RecordResult(new(cloudOperation with { ItemCount = itemCount }, outcome, duration, Error: error));
 		}
 
 		private async Task SearchAsync(BaseStorageFolder folder, IList<ListedItem> results, CancellationToken token)
@@ -395,15 +463,21 @@ namespace Files.App.Utils.Storage
 			}
 			else
 			{
-				var workingFolder = await GetStorageFolderAsync(folder);
-
 				var hiddenOnlyFromWin32 = false;
-				if (workingFolder)
+
+				// A restricted search stays in the search folder. The Win32 walk is inherently single-level, so the
+				// indexed query, which the indexer may still answer with subtree hits, is skipped whenever it can be.
+				var useIndexedQuery = !restrictToCurrentFolder || IsAQSQuery;
+				if (useIndexedQuery)
 				{
-					var storageFolder = workingFolder.Result
-						?? throw new InvalidOperationException($"The search folder '{folder}' could not be opened.");
-					await SearchAsync(storageFolder, results, token);
-					hiddenOnlyFromWin32 = (results.Count != 0);
+					var workingFolder = await GetStorageFolderAsync(folder);
+					if (workingFolder)
+					{
+						var storageFolder = workingFolder.Result
+							?? throw new InvalidOperationException($"The search folder '{folder}' could not be opened.");
+						await SearchAsync(storageFolder, results, token);
+						hiddenOnlyFromWin32 = (results.Count != 0);
+					}
 				}
 
 				if (!IsAQSQuery)
@@ -566,7 +640,8 @@ namespace Files.App.Utils.Storage
 					SearchTick?.Invoke(this, EventArgs.Empty);
 				}
 			}
-			if (token.IsCancellationRequested)
+			// A restricted search never walks into subfolders of a protected cloud location.
+			if (token.IsCancellationRequested || restrictToCurrentFolder)
 				return;
 
 			(FindCloseSafeHandle? hSubDir, WIN32_FIND_DATAW subDirData) = await Task.Run(() =>
@@ -856,7 +931,7 @@ namespace Files.App.Utils.Storage
 		{
 			var query = new QueryOptions
 			{
-				FolderDepth = FolderDepth.Deep,
+				FolderDepth = restrictToCurrentFolder ? FolderDepth.Shallow : FolderDepth.Deep,
 				UserSearchFilter = AQSQuery ?? string.Empty,
 			};
 

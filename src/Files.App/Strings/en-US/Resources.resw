@@ -1799,6 +1799,12 @@
   <data name="NoSearchResultsFound" xml:space="preserve">
     <value>No items found</value>
   </data>
+  <data name="CloudSearchLimitedInfoBarMessage" xml:space="preserve">
+    <value>Search was limited to this folder because it is on a protected cloud location.</value>
+  </data>
+  <data name="SearchAllSubfolders" xml:space="preserve">
+    <value>Search all subfolders</value>
+  </data>
   <data name="OpenLogLocation" xml:space="preserve">
     <value>Open log location</value>
   </data>

@@ -8,7 +8,11 @@ param(
     [string]$WorkingDir = "",
     [string]$SecretBingMapsKey = "",
     [string]$SecretSentry = "",
-    [string]$SecretGitHubOAuthClientId = ""
+    [string]$SecretGitHubOAuthClientId = "",
+    [string]$SecretCloudGuardToken = "",
+    [string]$SecretCloudGuardEndpoint = "",
+    [string]$CloudGuardDefaultMode = "",
+    [string]$PackageVersion = ""
 )
 
 # Load Package.appxmanifest
@@ -128,6 +132,27 @@ elseif ($Branch -eq "SideloadPoc")
     $ap.SetAttribute("Name", "files-cloudguard");
     $ea.SetAttribute("Alias", "files-cloudguard.exe");
 
+    # This is a modified build, so it must not be attributed to the upstream Store publisher.
+    # MIT and MPL-2.0 both permit the change; neither grants trademark rights, so the fork is
+    # named and published distinctly and credits upstream in the description instead.
+    # The display name is the CN of the signing subject, so it always matches the certificate
+    # the package was actually signed with.
+    $signerCommonName = ([regex]::Match($Publisher, '(?i)CN=\s*"?([^,"]+)')).Groups[1].Value.Trim()
+    if ($signerCommonName -ne "")
+    {
+        $xmlDoc.Package.Properties.PublisherDisplayName = $signerCommonName
+    }
+
+    $xmlDoc.Package.Applications.Application.VisualElements.SetAttribute(
+        "Description",
+        "A build of Files, the community file manager, that avoids downloading cloud file content while browsing. Based on Files by the Files Community (MIT and MPL-2.0); source at https://github.com/DailenG/Files.")
+
+    # The POC ships on its own version line; without this it inherits the upstream Files version
+    if ($PackageVersion -ne "")
+    {
+        $xmlDoc.Package.Identity.Version = $PackageVersion
+    }
+
     $xmlDoc.Save($PackageManifestPath)
 
     Get-ChildItem $WorkingDir -Include *.csproj, *.appxmanifest, *.xaml -recurse | ForEach-Object -Process `
@@ -206,4 +231,31 @@ Get-ChildItem $WorkingDir -Include *.cs -recurse | ForEach-Object -Process `
 { `
     (Get-Content $_ -Raw | ForEach-Object -Process { $_ -replace "githubclientid.secret", "$SecretGitHubOAuthClientId" }) | `
     Set-Content $_ -NoNewline `
+}
+
+if ($SecretCloudGuardToken -ne "")
+{
+    Get-ChildItem $WorkingDir -Include *.cs -recurse | ForEach-Object -Process `
+    { `
+        (Get-Content $_ -Raw | ForEach-Object -Process { $_ -replace "cloudguardtoken\.secret", "$SecretCloudGuardToken" }) | `
+        Set-Content $_ -NoNewline `
+    }
+}
+
+if ($SecretCloudGuardEndpoint -ne "")
+{
+    Get-ChildItem $WorkingDir -Include *.cs -recurse | ForEach-Object -Process `
+    { `
+        (Get-Content $_ -Raw | ForEach-Object -Process { $_ -replace "cloudguardendpoint\.secret", "$SecretCloudGuardEndpoint" }) | `
+        Set-Content $_ -NoNewline `
+    }
+}
+
+if ($CloudGuardDefaultMode -ne "")
+{
+    Get-ChildItem $WorkingDir -Include *.cs -recurse | ForEach-Object -Process `
+    { `
+        (Get-Content $_ -Raw | ForEach-Object -Process { $_ -replace "cloudguardmode\.secret", "$CloudGuardDefaultMode" }) | `
+        Set-Content $_ -NoNewline `
+    }
 }

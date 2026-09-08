@@ -202,33 +202,61 @@
 						TabIndex="2"
 						Visibility="{x:Bind ViewModel.ShowToolbar, Mode=OneWay}" />
 
-					<InfoBar
-						x:Name="NetworkDiscoveryInfoBar"
+					<StackPanel
 						Grid.Row="1"
 						Grid.ColumnSpan="3"
-						Margin="0,0,0,4"
-						x:Load="{x:Bind SidebarAdaptiveViewModel.PaneHolder.ActivePaneOrColumn.ShellViewModel.IsNetworkDiscoveryInfoBarOpen, Mode=OneWay}"
-						CornerRadius="8"
-						IsClosable="True"
-						IsIconVisible="True"
-						IsOpen="{x:Bind SidebarAdaptiveViewModel.PaneHolder.ActivePaneOrColumn.ShellViewModel.IsNetworkDiscoveryInfoBarOpen, Mode=TwoWay}"
-						Severity="Warning">
-						<Grid ColumnSpacing="8">
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="*" />
-								<ColumnDefinition Width="Auto" />
-							</Grid.ColumnDefinitions>
-							<TextBlock
-								VerticalAlignment="Center"
-								MaxLines="1"
-								Text="{x:Bind SidebarAdaptiveViewModel.PaneHolder.ActivePaneOrColumn.ShellViewModel.NetworkDiscoveryInfoBarMessage, Mode=OneWay}"
-								TextWrapping="Wrap" />
-							<Button
-								Grid.Column="1"
-								Command="{x:Bind ViewModel.OpenNetworkSharingSettingsCommand}"
-								Content="{helpers:ResourceString Name=OpenSettings}" />
-						</Grid>
-					</InfoBar>
+						Spacing="4">
+						<InfoBar
+							x:Name="NetworkDiscoveryInfoBar"
+							Margin="0,0,0,4"
+							x:Load="{x:Bind SidebarAdaptiveViewModel.PaneHolder.ActivePaneOrColumn.ShellViewModel.IsNetworkDiscoveryInfoBarOpen, Mode=OneWay}"
+							CornerRadius="8"
+							IsClosable="True"
+							IsIconVisible="True"
+							IsOpen="{x:Bind SidebarAdaptiveViewModel.PaneHolder.ActivePaneOrColumn.ShellViewModel.IsNetworkDiscoveryInfoBarOpen, Mode=TwoWay}"
+							Severity="Warning">
+							<Grid ColumnSpacing="8">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="Auto" />
+								</Grid.ColumnDefinitions>
+								<TextBlock
+									VerticalAlignment="Center"
+									MaxLines="1"
+									Text="{x:Bind SidebarAdaptiveViewModel.PaneHolder.ActivePaneOrColumn.ShellViewModel.NetworkDiscoveryInfoBarMessage, Mode=OneWay}"
+									TextWrapping="Wrap" />
+								<Button
+									Grid.Column="1"
+									Command="{x:Bind ViewModel.OpenNetworkSharingSettingsCommand}"
+									Content="{helpers:ResourceString Name=OpenSettings}" />
+							</Grid>
+						</InfoBar>
+
+						<InfoBar
+							x:Name="CloudSearchLimitedInfoBar"
+							Margin="0,0,0,4"
+							x:Load="{x:Bind SidebarAdaptiveViewModel.PaneHolder.ActivePaneOrColumn.ShellViewModel.IsCloudSearchLimitedInfoBarOpen, Mode=OneWay}"
+							CornerRadius="8"
+							IsClosable="True"
+							IsIconVisible="True"
+							IsOpen="{x:Bind SidebarAdaptiveViewModel.PaneHolder.ActivePaneOrColumn.ShellViewModel.IsCloudSearchLimitedInfoBarOpen, Mode=TwoWay}"
+							Severity="Informational">
+							<Grid ColumnSpacing="8">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*" />
+									<ColumnDefinition Width="Auto" />
+								</Grid.ColumnDefinitions>
+								<TextBlock
+									VerticalAlignment="Center"
+									Text="{helpers:ResourceString Name=CloudSearchLimitedInfoBarMessage}"
+									TextWrapping="Wrap" />
+								<Button
+									Grid.Column="1"
+									Command="{x:Bind SidebarAdaptiveViewModel.PaneHolder.ActivePaneOrColumn.ShellViewModel.SearchAllSubfoldersCommand, Mode=OneWay}"
+									Content="{helpers:ResourceString Name=SearchAllSubfolders}" />
+							</Grid>
+						</InfoBar>
+					</StackPanel>
 
 					<!--  Page Content  -->
 					<ContentPresenter

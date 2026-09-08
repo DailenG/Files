@@ -28,10 +28,10 @@ All exported telemetry uses normalized, coarse-grained buckets or predefined enu
 |---|---|
 | `provider.kind` | `egnyte`, `local`, `standard_network`, `other_cloud`, `unknown` |
 | `optimization.mode` | `off`, `observe`, `protect` |
-| `operation.name` | `navigate`, `enumerate_directory`, `request_thumbnail`, `request_preview`, `read_basic_metadata`, `open_file` |
+| `operation.name` | `navigate`, `enumerate_directory`, `request_thumbnail`, `request_preview`, `read_basic_metadata`, `search`, `open_file` |
 | `access.origin` | `navigation`, `folder_display`, `visible_item`, `selection_changed`, `hover`, `restored_tab`, `explicit_button` |
 | `access.is_explicit` | `true`, `false` |
-| `policy.decision` | `allowed`, `observed`, `cached_only`, `deferred`, `generic_fallback`, `blocked`, `not_applicable` |
+| `policy.decision` | `allowed`, `observed`, `cached_only`, `deferred`, `generic_fallback`, `redirected`, `blocked`, `not_applicable` |
 | `operation.outcome` | `success`, `failure`, `cancelled` |
 | `duration_ms` | Numeric duration in milliseconds |
 | `thumbnail.result` | `cache_hit`, `cache_miss`, `generic_fallback`, `not_attempted` |
@@ -49,19 +49,19 @@ Settings live in the Files `user_settings.json` file under `%LOCALAPPDATA%\Packa
 
 | Key | Default | Meaning |
 |---|---|---|
-| `Mode` | `Off` | `Off`, `Observe`, or `Protect` |
-| `TelemetryEnabled` | `false` | Export to the collector. Opt-in. No effect when `Mode` is `Off` |
-| `TelemetryEndpoint` | `http://localhost:4318` | OTLP/HTTP base URL; `/v1/traces` and `/v1/metrics` are appended. Plaintext `http` is accepted only for loopback; any other host must be `https`. Redirects are never followed |
+| `Mode` | compiled-in mode (`Observe` in release builds), or `Off` in local builds | `Off`, `Observe`, or `Protect` |
+| `TelemetryEnabled` | `true` | Export to the collector. No effect when `Mode` is `Off` |
+| `TelemetryEndpoint` | compiled-in pilot endpoint, or `http://localhost:4318` in local builds | OTLP/HTTP base URL; `/v1/traces` and `/v1/metrics` are appended. Plaintext `http` is accepted only for loopback; any other host must be `https`. Redirects are never followed |
 | `EgnyteConfiguredRoots` | `[]` | Administrator override roots treated as Egnyte; empty means automatic detection |
 | `InstallationId` | generated | Random identifier; delete the key to rotate it |
-| (credential vault) `Files.CloudGuard.Telemetry` | none | Bearer token sent as `Authorization` on every export. Set via `ICloudOptimizationSettingsService.TelemetryAuthToken` or the `FILES_CLOUD_GUARD_TOKEN` environment variable; never written to `user_settings.json` |
+| (credential vault) `Files.CloudGuard.Telemetry` | none | Bearer token sent as `Authorization` on every export. Resolved as `FILES_CLOUD_GUARD_TOKEN`, then the vault, then the token compiled into release packages; never written to `user_settings.json` |
 
 The environment variable `FILES_CLOUD_GUARD_MODE` (`Off`/`Observe`/`Protect`) overrides `Mode` for the process lifetime. This is intended for development and controlled tests.
 
 1. **Operating Modes**:
    - `Off`: No spans or measurements are created. The exporter is not started.
    - `Observe`: Stock Files behavior; cloud-backed interactions are recorded.
-   - `Protect`: Interactions and policy decisions are recorded. Enforcement is not implemented yet; behavior currently matches `Observe`.
+   - `Protect`: Interactions and policy decisions are recorded, and enforcement is applied on hydration-risk locations: cached-only thumbnails, deferred previews, and current-folder-only search.
 2. **What is recorded**: only operations whose location classifies as cloud-backed (`IsCloudBacked`). Local disks and standard network shares produce no telemetry.
 3. **Collector Unavailability**: recording uses bounded in-memory batching (queue 2048 spans, 2 s export timeout, 10 s metric interval). An unreachable collector drops data silently; nothing is spooled to disk, so a machine that cannot reach the internal collector (for example, off the corporate network) exports nothing. The UI and file operations are never blocked.
 4. **Failure isolation**: telemetry recording errors are swallowed and logged at most five times per process as a warning that contains only the exception type name.
@@ -78,3 +78,4 @@ The environment variable `FILES_CLOUD_GUARD_MODE` (`Off`/`Observe`/`Protect`) ov
 - Mode changes apply to recording immediately, but export start/stop is evaluated at launch; restart Files after changing `TelemetryEnabled` or `TelemetryEndpoint`.
 - Path-correlation tokens (HMAC of normalized paths) are not implemented in the POC.
 - Transport security ends at the internal collector. Loopback export (development) is plaintext by design; the pilot endpoint is HTTPS with a bearer token checked by the reverse proxy in front of SigNoz. Any process running as the same Windows user can read the token from the credential vault, which is the same trust boundary as the user's own files.
+- Release packages carry the pilot ingest token in the binary. Anyone with the package can extract it and post to the collector, so it is a pilot-scoped write credential on an internal-only endpoint, not a secret. Rotate it in `/mnt/user/appdata/otel-ingress/.env` and in the `CLOUD_GUARD_INGEST_TOKEN` repository secret, then publish a new build.

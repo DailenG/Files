@@ -28,6 +28,39 @@ function Ensure-Directory([string]$Path) {
     if (-not (Test-Path $Path)) { New-Item -ItemType Directory -Path $Path | Out-Null }
 }
 
+# Reads a package's embedded AppxManifest.xml
+function Get-PackageManifestXml([string]$PackagePath) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($PackagePath)
+    try {
+        $entry = $zip.Entries | Where-Object { $_.FullName -eq "AppxManifest.xml" } | Select-Object -First 1
+        if ($null -eq $entry) { return $null }
+        $reader = New-Object System.IO.StreamReader($entry.Open())
+        try { [xml]$reader.ReadToEnd() } finally { $reader.Close() }
+    } finally { $zip.Dispose() }
+}
+
+function Get-PackageIdentityName([string]$PackagePath) {
+    $manifest = Get-PackageManifestXml $PackagePath
+    if ($null -eq $manifest) { return "" }
+    $nsMgr = New-Object System.Xml.XmlNamespaceManager($manifest.NameTable)
+    $nsMgr.AddNamespace("pkg", "http://schemas.microsoft.com/appx/manifest/foundation/windows10")
+    $id = $manifest.SelectSingleNode("/pkg:Package/pkg:Identity", $nsMgr)
+    if ($null -eq $id) { return "" }
+    return $id.GetAttribute("Name")
+}
+
+# Framework packages the app package actually declares. Supplying anything else
+# makes Add-AppxPackage fail with 0x80073CF3 (provided but not used).
+function Get-DeclaredDependencyNames([string]$PackagePath) {
+    $manifest = Get-PackageManifestXml $PackagePath
+    if ($null -eq $manifest) { return @() }
+    $nsMgr = New-Object System.Xml.XmlNamespaceManager($manifest.NameTable)
+    $nsMgr.AddNamespace("pkg", "http://schemas.microsoft.com/appx/manifest/foundation/windows10")
+    $nodes = $manifest.SelectNodes("/pkg:Package/pkg:Dependencies/pkg:PackageDependency", $nsMgr)
+    return @($nodes | ForEach-Object { $_.GetAttribute("Name") })
+}
+
 # Canonical arch names for the WAP-compatible folder layout
 $archMap = @{ 'arm64' = 'ARM64'; 'x64' = 'x64'; 'x86' = 'x86' }
 
@@ -101,6 +134,15 @@ Move-Item $bundlePath $organizedBundlePath -Force
 Write-Host "Moved bundle to: $organizedBundlePath"
 
 # --- Merge dependency folders from each per-platform build ---
+# Only framework packages the app manifest declares are kept: Add-AppxPackage
+# rejects the whole install when handed a package the manifest does not use.
+
+$declaredDependencies = @($msixFiles | ForEach-Object { Get-DeclaredDependencyNames $_.FullName } | Sort-Object -Unique)
+if ($declaredDependencies.Count -eq 0) {
+    Write-Warning "No PackageDependency entries found in the built packages; dependencies will not be staged"
+} else {
+    Write-Host "Declared dependencies: $($declaredDependencies -join ', ')"
+}
 
 $organizedDepsDir = Join-Path $bundleFolderPath "Dependencies"
 foreach ($msix in $msixFiles) {
@@ -115,12 +157,18 @@ foreach ($msix in $msixFiles) {
 
         $targetArchDir = Join-Path $organizedDepsDir $canonicalArch
         Ensure-Directory $targetArchDir
-        Get-ChildItem -Path $_.FullName -File | ForEach-Object {
+        Get-ChildItem -Path (Join-Path $_.FullName '*') -File -Include *.appx, *.msix | ForEach-Object {
             $destFile = Join-Path $targetArchDir $_.Name
-            if (-not (Test-Path $destFile)) {
-                Copy-Item $_.FullName -Destination $destFile
-                Write-Host "  Copied dependency: $destFile"
+            if (Test-Path $destFile) { return }
+
+            $depName = Get-PackageIdentityName $_.FullName
+            if ($declaredDependencies -notcontains $depName) {
+                Write-Host "  Skipped undeclared dependency: $($_.Name) ($depName)"
+                return
             }
+
+            Copy-Item $_.FullName -Destination $destFile
+            Write-Host "  Copied dependency: $destFile"
         }
     }
 }
@@ -129,18 +177,23 @@ foreach ($msix in $msixFiles) {
 
 $vcLibsSdkBase = "${env:ProgramFiles(x86)}\Microsoft SDKs\Windows Kits\10\ExtensionSDKs"
 $vcLibsPackages = @(
-    @{ SdkFolder = "Microsoft.VCLibs";         FileTemplate = "Microsoft.VCLibs.{0}.14.00.appx" },
-    @{ SdkFolder = "Microsoft.VCLibs.Desktop"; FileTemplate = "Microsoft.VCLibs.{0}.14.00.Desktop.appx" }
+    @{ Name = "Microsoft.VCLibs.140.00";            SdkFolder = "Microsoft.VCLibs";         FileTemplate = "Microsoft.VCLibs.{0}.14.00.appx" },
+    @{ Name = "Microsoft.VCLibs.140.00.UWPDesktop"; SdkFolder = "Microsoft.VCLibs.Desktop"; FileTemplate = "Microsoft.VCLibs.{0}.14.00.Desktop.appx" }
 )
 
 foreach ($platform in $platformList) {
     $canonicalArch = $archMap[$platform]
     if (-not $canonicalArch) { continue }
 
-    $targetArchDir = Join-Path $organizedDepsDir $canonicalArch
-    Ensure-Directory $targetArchDir
-
     foreach ($vcLib in $vcLibsPackages) {
+        if ($declaredDependencies -notcontains $vcLib.Name) {
+            Write-Host "  Skipped $($vcLib.Name) for ${platform}: not declared by the package"
+            continue
+        }
+
+        $targetArchDir = Join-Path $organizedDepsDir $canonicalArch
+        Ensure-Directory $targetArchDir
+
         $fileName = $vcLib.FileTemplate -f $canonicalArch
         $destPath = Join-Path $targetArchDir $fileName
         if (Test-Path $destPath) { continue }
@@ -216,18 +269,11 @@ if ($AppInstallerUri -ne "" -and ($BuildMode -eq "Sideload" -or $BuildMode -eq "
     # Build dependency XML entries by reading each package's embedded manifest
     $dependencyEntries = ""
     if (Test-Path $organizedDepsDir) {
-        Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
         Get-ChildItem -Path $organizedDepsDir -Recurse -Include *.appx, *.msix | ForEach-Object {
             $depArch = Split-Path (Split-Path $_.FullName -Parent) -Leaf
 
-            $depZip = [System.IO.Compression.ZipFile]::OpenRead($_.FullName)
-            try {
-                $entry = $depZip.Entries | Where-Object { $_.FullName -eq "AppxManifest.xml" } | Select-Object -First 1
-                if ($null -eq $entry) { return }
-                $reader = New-Object System.IO.StreamReader($entry.Open())
-                [xml]$depManifest = $reader.ReadToEnd()
-                $reader.Close()
-            } finally { $depZip.Dispose() }
+            $depManifest = Get-PackageManifestXml $_.FullName
+            if ($null -eq $depManifest) { return }
 
             $nsMgr = New-Object System.Xml.XmlNamespaceManager($depManifest.NameTable)
             $nsMgr.AddNamespace("pkg", "http://schemas.microsoft.com/appx/manifest/foundation/windows10")

@@ -23,6 +23,11 @@ on:
         description: 'Mark the release as a prerelease'
         type: boolean
         default: true
+      default_mode:
+        description: 'Cloud Guard mode compiled into the build'
+        type: choice
+        options: [Observe, Protect, Off]
+        default: Observe
 
 jobs:
   build:
@@ -76,6 +81,12 @@ jobs:
     - name: Configure the package manifest, logo, and secrets
       shell: pwsh
       run: |
+        # v0.1.1-poc -> 0.1.1.0; MSIX identities require four numeric parts
+        $numeric = ('${{ inputs.tag }}' -replace '^v', '') -replace '-.*$', ''
+        $parts = @($numeric -split '\.') + @('0', '0', '0', '0')
+        $packageVersion = ($parts[0..3] -join '.')
+        Write-Host "POC package version: $packageVersion"
+
         . './.github/scripts/Configure-AppxManifest.ps1' `
           -Branch "SideloadPoc" `
           -PackageManifestPath "$env:PACKAGE_MANIFEST_PATH" `
@@ -83,11 +94,17 @@ jobs:
           -WorkingDir "$env:WORKING_DIR" `
           -SecretBingMapsKey "$env:SECRET_BINGMAPS_KEY" `
           -SecretSentry "$env:SECRET_SENTRY" `
-          -SecretGitHubOAuthClientId "$env:SECRET_GITHUB_OAUTH_CLIENT_ID"
+          -SecretGitHubOAuthClientId "$env:SECRET_GITHUB_OAUTH_CLIENT_ID" `
+          -SecretCloudGuardToken "$env:SECRET_CLOUD_GUARD_TOKEN" `
+          -SecretCloudGuardEndpoint "$env:SECRET_CLOUD_GUARD_ENDPOINT" `
+          -CloudGuardDefaultMode "${{ inputs.default_mode }}" `
+          -PackageVersion $packageVersion
       env:
         SECRET_BINGMAPS_KEY: ${{ secrets.BING_MAPS_SECRET }}
         SECRET_SENTRY: ${{ secrets.SENTRY_SECRET }}
         SECRET_GITHUB_OAUTH_CLIENT_ID: ${{ secrets.GH_OAUTH_CLIENT_ID }}
+        SECRET_CLOUD_GUARD_TOKEN: ${{ secrets.CLOUD_GUARD_INGEST_TOKEN }}
+        SECRET_CLOUD_GUARD_ENDPOINT: ${{ secrets.CLOUD_GUARD_TELEMETRY_ENDPOINT }}
 
     - name: Restore Files
       shell: pwsh
@@ -226,6 +243,14 @@ jobs:
         if ($deps) { Compress-Archive -Path "$($deps.FullName)\*" -DestinationPath "$stage\Dependencies.zip" -Force }
         if (Test-Path "$env:ARTIFACTS_STAGING_DIR\FilesCloudGuard.cer") { Copy-Item "$env:ARTIFACTS_STAGING_DIR\FilesCloudGuard.cer" $stage }
         Copy-Item 'docs\pilot-runbook.md' $stage
+
+        # Single self-contained artifact for the Chocolatey package: the bundle plus every
+        # framework dependency the manifest declares, so deployment needs one URL and one hash.
+        $deploy = "$env:ARTIFACTS_STAGING_DIR\deploy"
+        New-Item -ItemType Directory -Force -Path $deploy | Out-Null
+        Get-ChildItem $stage -Filter *.msixbundle | ForEach-Object { Copy-Item $_.FullName $deploy }
+        if ($deps) { Get-ChildItem "$($deps.FullName)" -Recurse -File | ForEach-Object { Copy-Item $_.FullName $deploy } }
+        Compress-Archive -Path "$deploy\*" -DestinationPath "$stage\FilesCloudGuard.Deploy.zip" -Force
         Get-ChildItem $stage | Select-Object Name, Length
 
     - name: Publish the GitHub release

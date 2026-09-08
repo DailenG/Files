@@ -72,10 +72,11 @@ namespace Files.Shared.Cloud
 
 			// 2. Check configured root overrides. These may be subfolders of an otherwise local drive, so they are
 			//    evaluated before, and never stored in, the per-drive-root cache.
+			string normalizedWithSeparator = NormalizeRoot(normalized);
 			foreach (var configuredRoot in _configuredEgnyteRoots)
 			{
 				if (root.Equals(configuredRoot, StringComparison.OrdinalIgnoreCase) ||
-				    normalized.StartsWith(configuredRoot, StringComparison.OrdinalIgnoreCase))
+				    normalizedWithSeparator.StartsWith(configuredRoot, StringComparison.OrdinalIgnoreCase))
 				{
 					return ValueTask.FromResult(new CloudLocationContext(
 						CloudLocationKind.Egnyte,

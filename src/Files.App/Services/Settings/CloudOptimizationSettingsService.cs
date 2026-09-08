@@ -13,6 +13,15 @@ namespace Files.App.Services.Settings
 		private const string TokenVaultResource = "Files.CloudGuard.Telemetry";
 		private const string TokenVaultUser = "otlp";
 
+		// Replaced at packaging time by .github/scripts/Configure-AppxManifest.ps1. An unreplaced value still ends
+		// with the placeholder suffix and is ignored, so local builds keep the loopback default, no token, and Off.
+		private const string BuiltInTelemetryToken = "cloudguardtoken.secret";
+		private const string BuiltInTelemetryEndpoint = "cloudguardendpoint.secret";
+		private const string BuiltInDefaultMode = "cloudguardmode.secret";
+
+		private static bool IsUnreplaced(string value)
+			=> string.IsNullOrEmpty(value) || value.EndsWith(".secret", StringComparison.Ordinal);
+
 		private static readonly CloudOptimizationMode? EnvironmentModeOverride =
 			Enum.TryParse<CloudOptimizationMode>(Environment.GetEnvironmentVariable(ModeEnvironmentVariable), ignoreCase: true, out var mode)
 			&& Enum.IsDefined(mode) ? mode : null;
@@ -25,29 +34,50 @@ namespace Files.App.Services.Settings
 		/// <inheritdoc/>
 		public CloudOptimizationMode Mode
 		{
-			get => EnvironmentModeOverride ?? Get(CloudOptimizationMode.Off);
+			get => EnvironmentModeOverride ?? Get(BuiltInDefaultModeValue);
 			set => Set(value);
 		}
+
+		private static CloudOptimizationMode BuiltInDefaultModeValue =>
+			!IsUnreplaced(BuiltInDefaultMode)
+			&& Enum.TryParse<CloudOptimizationMode>(BuiltInDefaultMode, ignoreCase: true, out var builtIn)
+			&& Enum.IsDefined(builtIn)
+				? builtIn
+				: CloudOptimizationMode.Off;
 
 		/// <inheritdoc/>
 		public bool TelemetryEnabled
 		{
-			get => Get(false);
+			get => Get(true);
 			set => Set(value);
 		}
 
 		/// <inheritdoc/>
 		public string TelemetryEndpoint
 		{
-			get => Get(DefaultTelemetryEndpoint) ?? DefaultTelemetryEndpoint;
+			get
+			{
+				var fallback = IsUnreplaced(BuiltInTelemetryEndpoint) ? DefaultTelemetryEndpoint : BuiltInTelemetryEndpoint;
+				return Get(fallback) ?? fallback;
+			}
 			set => Set(value);
 		}
 
 		/// <inheritdoc/>
 		public string TelemetryAuthToken
 		{
-			get => Environment.GetEnvironmentVariable(TokenEnvironmentVariable)
-				?? CredentialsHelpers.GetPassword(TokenVaultResource, TokenVaultUser);
+			get
+			{
+				var environmentToken = Environment.GetEnvironmentVariable(TokenEnvironmentVariable);
+				if (!string.IsNullOrEmpty(environmentToken))
+					return environmentToken;
+
+				var vaultToken = CredentialsHelpers.GetPassword(TokenVaultResource, TokenVaultUser);
+				if (!string.IsNullOrEmpty(vaultToken))
+					return vaultToken;
+
+				return IsUnreplaced(BuiltInTelemetryToken) ? string.Empty : BuiltInTelemetryToken;
+			}
 			set
 			{
 				if (!string.IsNullOrEmpty(CredentialsHelpers.GetPassword(TokenVaultResource, TokenVaultUser)))

@@ -176,6 +176,7 @@ namespace Files.App.ViewModels
 		private CancellationTokenSource loadPropsCTS;
 		private CancellationTokenSource watcherCTS;
 		private CancellationTokenSource? searchCTS;
+		private FolderSearch? lastSearch;
 		private CancellationTokenSource? updateTagGroupCTS;
 		private CancellationTokenSource? filterDebounceCS;
 		private CancellationTokenSource? networkAvailabilityCTS;
@@ -331,6 +332,18 @@ namespace Files.App.ViewModels
 			get => isNetworkDiscoveryInfoBarOpen;
 			set => SetProperty(ref isNetworkDiscoveryInfoBarOpen, value);
 		}
+
+		private bool isCloudSearchLimitedInfoBarOpen;
+		public bool IsCloudSearchLimitedInfoBarOpen
+		{
+			get => isCloudSearchLimitedInfoBarOpen;
+			set => SetProperty(ref isCloudSearchLimitedInfoBarOpen, value);
+		}
+
+		/// <summary>
+		/// Re-runs the last search with deep recursion allowed on a protected cloud location.
+		/// </summary>
+		public IAsyncRelayCommand SearchAllSubfoldersCommand { get; }
 
 		private bool isLocationUnavailable;
 		public bool IsLocationUnavailable
@@ -743,6 +756,7 @@ namespace Files.App.ViewModels
 			loadThumbnailSemaphore = new SemaphoreSlim(8, 8);
 			gitPropertiesSemaphore = new SemaphoreSlim(1, 1);
 			dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+			SearchAllSubfoldersCommand = new AsyncRelayCommand(SearchAllSubfoldersAsync);
 
 			UserSettingsService.OnSettingChangedEvent += UserSettingsService_OnSettingChangedEvent;
 			fileTagsSettingsService.OnSettingImportedEvent += FileTagsSettingsService_OnSettingUpdated;
@@ -907,6 +921,7 @@ namespace Files.App.ViewModels
 			CloseWatcher();
 			CancelNetworkAvailabilityUpdate();
 			IsNetworkDiscoveryInfoBarOpen = false;
+			IsCloudSearchLimitedInfoBarOpen = false;
 			if (IsLoadingItems)
 			{
 				IsLoadingCancelled = true;
@@ -3431,6 +3446,8 @@ namespace Files.App.ViewModels
 
 			CancelSearch();
 			searchCTS = new CancellationTokenSource();
+			lastSearch = search;
+			IsCloudSearchLimitedInfoBarOpen = false;
 			filesAndFolders.Clear();
 			IsLoadingItems = true;
 			IsSearchResults = true;
@@ -3464,6 +3481,23 @@ namespace Files.App.ViewModels
 
 			ItemLoadStatusChanged?.Invoke(this, new ItemLoadStatusChangedEventArgs() { Status = ItemLoadStatusChangedEventArgs.ItemLoadStatus.Complete });
 			IsLoadingItems = false;
+			IsCloudSearchLimitedInfoBarOpen = search.WasLimitedToCurrentFolder && searchCTS?.IsCancellationRequested != true;
+		}
+
+		private async Task SearchAllSubfoldersAsync()
+		{
+			if (lastSearch is null)
+				return;
+
+			IsCloudSearchLimitedInfoBarOpen = false;
+
+			await SearchAsync(new FolderSearch()
+			{
+				Query = lastSearch.Query,
+				Folder = lastSearch.Folder,
+				MaxItemCount = lastSearch.MaxItemCount,
+				AllowDeepCloudSearch = true,
+			});
 		}
 
 		public void CancelSearch()
