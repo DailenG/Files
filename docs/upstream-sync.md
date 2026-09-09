@@ -2,6 +2,9 @@
 
 This repository (`DailenG/Files`) is maintained as an upstream-friendly fork of [files-community/Files](https://github.com/files-community/Files).
 
+This guide covers pulling upstream changes **in**. For fork changes worth sending **out**, see
+[upstream-candidates.md](upstream-candidates.md).
+
 ## Remote Configuration
 
 To check existing remotes:
