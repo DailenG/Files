@@ -322,27 +322,46 @@ namespace Files.App.Utils.Cloud
 
 			if (AutodeskKey is not null)
 			{
-				string iconPath = Path.Combine(programFilesFolder
-					?? throw new InvalidOperationException("The ProgramFiles environment variable is not set."), "Autodesk", "Desktop Connector", "DesktopConnector.Applications.Tray.exe");
-				var iconFile = Win32Helper.ExtractSelectedIconsFromDLL(iconPath, new List<int>() { 32512 }).FirstOrDefault();
 				var mainFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "DC");
-				var autodeskFolders = Directory.GetDirectories(mainFolder, "", SearchOption.AllDirectories);
 
-				foreach (var autodeskFolder in autodeskFolders)
+				// The workspace can be relocated through Desktop Connector's Change Workspace command
+				if (Directory.Exists(mainFolder))
 				{
-					var folderName = Path.GetFileName(autodeskFolder);
-					if (folderName is not null)
-						results.Add(new CloudProvider(CloudProviders.Autodesk)
-						{
-							Name = $"Autodesk - {Path.GetFileName(autodeskFolder)}",
-							SyncFolder = autodeskFolder,
-							IconData = iconFile?.IconData
-						});
+					string iconPath = Path.Combine(programFilesFolder
+						?? throw new InvalidOperationException("The ProgramFiles environment variable is not set."), "Autodesk", "Desktop Connector", "DesktopConnector.Applications.Tray.exe");
+					var iconFile = Win32Helper.ExtractSelectedIconsFromDLL(iconPath, new List<int>() { 32512 }).FirstOrDefault();
+
+					// Only the top level holds connectors (ACCDocs, Drive, Fusion). Recursing would add
+					// every hub, project and project subfolder as its own drive.
+					var connectorFolders = Directory.GetDirectories(mainFolder, "*", SearchOption.TopDirectoryOnly);
+
+					foreach (var connectorFolder in connectorFolders)
+					{
+						var folderName = Path.GetFileName(connectorFolder);
+						if (!string.IsNullOrEmpty(folderName))
+							results.Add(new CloudProvider(CloudProviders.Autodesk)
+							{
+								Name = GetAutodeskConnectorName(folderName),
+								SyncFolder = connectorFolder,
+								IconData = iconFile?.IconData
+							});
+					}
 				}
 			}
 
 			return Task.FromResult<IEnumerable<ICloudProvider>>(results);
 		}
+
+		/// <summary>
+		/// Maps a Desktop Connector workspace folder to the name File Explorer shows for it.
+		/// </summary>
+		private static string GetAutodeskConnectorName(string folderName) => folderName switch
+		{
+			"ACCDocs" => "Autodesk Docs",
+			"Drive" => "Autodesk Drive",
+			"Fusion" => "Autodesk Fusion",
+			_ => $"Autodesk - {folderName}"
+		};
 
 		private static string GetDriveType(string driveIdentifier, RegistryKey? namespaceSubKey, RegistryKey? syncRootManagerKey)
 		{
