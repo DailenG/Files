@@ -84,6 +84,87 @@ cancel button.
 - Cancelling, or navigating back during preparation, leaves the archive unopened and the view
   restored. No partial archive state is ever shown.
 
+### The preparing state in the content area
+
+There is no in-content loading state today. The only progress affordance during navigation is a
+spinner on the tab, set by `BaseShellPage.SetLoadingIndicatorForTabs`. The content area has exactly
+three states, driven by `EmptyTextType`: `None`, `FolderEmpty` and `NoSearchResultsFound`.
+
+That is a problem this design creates for itself. `ShellViewModel.UpdateEmptyTextType` sets
+`FolderEmpty` whenever `FilesAndFolders.Count == 0 && !IsLocationUnavailable`. Today that is never
+reached for an archive, because hydration completes inside `OpenDirectory` *before* the view
+changes, so the user sits on the old folder watching a tab spinner. The moment we navigate first and
+prepare afterwards, an empty list plus a long preparation means the user reads **"This folder is
+empty"** while a 1 GB download runs. Replacing a silent wait with a confident wrong answer is worse
+than the bug we set out to fix.
+
+So the preparing state is required, not decorative: add a fourth `EmptyTextType` member, e.g.
+`Preparing`, with a visual state carrying a progress ring and a message. `FolderEmptyIndicator` is
+already a visual-state-driven control bound in all three layouts, so this is a small, contained
+extension of an existing control rather than a new page.
+
+Deliberately **not** a full-page loading splash. A distinct page creates a mode to enter and leave,
+which flickers on fast operations and needs its own back-navigation behaviour. Extending the state
+the layouts already have costs less and cannot flicker, because the grace period means it is never
+shown for fast work. Skeleton placeholder rows are a possible refinement later; they are strictly
+more work than a ring and would need fake rows in a virtualized list, so they are not in the first
+cut.
+
+### Status Center volume and card lifecycle
+
+Flooding is a fair concern and the design has to answer it rather than hope. Four things keep the
+volume down, in descending order of importance:
+
+1. **The grace period.** Fast preparations never create a card at all. On local disks this feature is
+   invisible, which is the common case by a wide margin.
+2. **Deduplication.** One card per path, however many times the user double-clicks.
+3. **Self-dismissal on seamless completion.** If preparation finishes while the user is still at the
+   destination, the card has served no purpose and removes itself. The content filling in *is* the
+   notification. A card that survives here is pure litter, and this is the case that would otherwise
+   generate one card per archive open.
+4. **Only cards the user left behind persist,** because those are the ones carrying the "go to the
+   prepared location" action. A persisting card always corresponds to something the user walked away
+   from and might want to return to.
+
+Point 3 is the one that decides whether this floods. `StatusCenterViewModel.RemoveItem` already
+exists, so self-dismissal is available; what is new is the policy of using it. Note this makes
+preparation cards behave unlike file-operation cards, which persist until dismissed. That asymmetry
+is intentional and worth stating in review: a completed copy is a record worth keeping, a completed
+preparation the user already saw resolve is not.
+
+This is also why the scope line in this ADR matters. Preparation covers operations the user
+explicitly requested, which are bounded by how fast a person can double-click. Extending it to
+passive operations such as thumbnails or enumeration would produce hundreds of cards, and that is
+precisely what is ruled out below.
+
+### Completed cards should be actionable, generally
+
+The "go to the prepared location" action should not be special-cased to preparation. Today
+`StatusCenterItem` exposes only `CancelCommand`, so a finished copy, move, extract or compress tells
+you it succeeded and then offers nothing. Clicking it should take you to the result.
+
+The data is already there: `StatusCenterItem` carries `Source` and `Destination` as
+`IEnumerable<string>`, populated by every `StatusCenterHelper` call site. A generic completed-card
+activation can navigate to the destination's parent and select the item, reusing
+`NavigationHelpers.OpenPath` with `selectItems`, which already exists for exactly this shape of
+request.
+
+Cases that need explicit handling rather than a generic fallback:
+
+- **Delete and recycle** have no meaningful destination. The card must not be activatable; a no-op
+  click that looks clickable is worse than an inert card.
+- **Multi-item operations** should select all results in a shared parent, and fall back to the parent
+  alone when they span several.
+- **Failed and cancelled cards** should not offer to navigate to a result that does not exist.
+- **A destination that has since been deleted or unmounted** needs to fail gracefully, not throw.
+
+This is genuinely useful independent of preparation, is upstream-shaped, and touches no Cloud Guard
+code. Two consequences follow. It is a better first upstream contribution than the preparation
+feature itself, since it is small and uncontroversial. And it should be built and merged
+*before* preparation, so that preparation's completed card is simply an instance of a general
+behaviour rather than the reason the behaviour exists. See
+[upstream-candidates.md](../upstream-candidates.md).
+
 ### Honesty constraint on progress
 
 The cloud provider does not report hydration progress. Byte-level progress therefore requires Files
@@ -191,9 +272,23 @@ The pilot must not be disturbed by an experiment:
 - The POC package uses a fixed MSIX `Identity/Name` of `FilesCloudGuard`, so an experimental build
   **replaces the pilot build** on whatever machine installs it. Install on a non-pilot machine, or
   accept that the device changes channel.
-- Tag experiments distinctly, for example `v0.2.0-alpha1`, dispatching the workflow against this
-  branch rather than `main`.
+- **Versioning.** A branch build advances the **patch** number; merging a feature to `main` advances
+  the **minor** number and resets the patch. Pilot is on `v0.1.4-poc`, so the first test build of
+  this branch is `v0.1.5-poc` and merging this feature produces `v0.2.0-poc`. Patch numbers on a
+  branch are consumed in order across branches; they are build counters, not per-branch sequences.
 - Do **not** mirror an experimental build to R2 and do **not** bump the Chocolatey package. Those are
   the pilot distribution channel. Install by hand per the pilot runbook.
 - `app.version` is already a telemetry resource attribute and the `Mode per device` dashboard panel
   groups by it, so an experimental build is distinguishable from pilot data rather than polluting it.
+- **No workflow change is needed for the tag suffix.** `cd-poc.yml` derives the MSIX version with
+  `('<tag>' -replace '^v', '') -replace '-.*$', ''`, so any suffix is stripped: `v0.1.5-alpha1` and
+  `v0.1.5-poc` both yield `0.1.5.0`. The suffix is therefore invisible to Windows, and the patch
+  number is what actually distinguishes builds. Keep patch numbers unique per build.
+- **A test machine cannot go back.** MSIX upgrades must increase the version, so a machine that
+  installs `0.1.5.0` cannot return to pilot `0.1.4.0` without uninstalling first. Since uninstall
+  deliberately keeps `user_settings.json` and the `InstallationId`, that is recoverable, but it is a
+  manual step. This is the concrete reason to test on a non-pilot machine.
+
+This scheme belongs in `docs/release-and-deployment.md` alongside the rest of the release process. It
+is recorded here instead because that file currently has uncommitted local edits, and it should be
+promoted once those land.

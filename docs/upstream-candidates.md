@@ -80,6 +80,21 @@ than disappearing. Worth asking upstream reviewers with Desktop Connector instal
 **Not verified on a live machine.** No Desktop Connector on the development machine. The enumeration
 change was proven against a simulated tree, and the reporting user is the real test.
 
+## Identified, not built
+
+Upstream-shaped work found while investigating something else. Recorded so the analysis is not lost;
+none of it is written yet, so none of it is sendable. All three came out of
+[adr/0003-prepared-location-access.md](adr/0003-prepared-location-access.md).
+
+| Item | Where | Why it qualifies |
+|---|---|---|
+| Archive hydrated twice on first open | `ZipStorageFolder.FromPathAsync` -> `CheckAccess`, then `GetItemsAsync` -> `OpenZipFileAsync` | The access probe builds a `SevenZipExtractor` purely to answer "is this browsable", discards it, and the index read immediately reopens the archive. Invisible locally because the page cache absorbs it; on a cloud file it doubles a whole-file fetch. Provider-neutral |
+| Archive index re-read on every in-archive navigation | `ZipStorageFolder.GetItemsAsync` | A fresh extractor per navigation. An index cache keyed on container path, invalidated on write, would make in-archive browsing instant after the first open. There is precedent in the same class, which already caches per-container encoding |
+| Completed Status Center cards are not actionable | `StatusCenterItem`, `StatusCenter.xaml` | A finished copy, move, extract or compress reports success and offers nothing. `Source` and `Destination` are already populated by every `StatusCenterHelper` call site, so activation can navigate to the destination's parent and select the result through `NavigationHelpers.OpenPath` with `selectItems`. Needs explicit handling for delete and recycle, which have no destination, and for failed or cancelled cards |
+
+The third is the best next upstream contribution on this list: small, self-contained, no Cloud Guard
+involvement, and useful to every Files user rather than only to cloud ones.
+
 ## Deliberately not candidates
 
 | Change | Why it stays in the fork |
