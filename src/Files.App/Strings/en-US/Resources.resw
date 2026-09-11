@@ -3967,6 +3967,10 @@
     <value>Preparing the operation...</value>
     <comment>Shown in a StatusCenter card.</comment>
   </data>
+  <data name="StatusCenter_ShowResult" xml:space="preserve">
+    <value>Show in folder</value>
+    <comment>Tooltip of the button on a completed StatusCenter card that navigates to the items the operation produced.</comment>
+  </data>
   <data name="StatusCenter_ProcessedItems_Header" xml:space="preserve">
     <value>{0}/{1, plural, one {# item} other {# items}} processed</value>
     <comment>Shown in a StatusCenter card. Used as "8/20 items processed"</comment>

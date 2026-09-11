@@ -24,6 +24,13 @@ namespace Files.App.UserControls.StatusCenter
 			ViewModel.RemoveAllCompletedItems();
 		}
 
+		private void StatusCenterItemsListView_ItemClick(object sender, ItemClickEventArgs e)
+		{
+			// Only completed operations that produced something have somewhere to go
+			if (e.ClickedItem is StatusCenterItem { CanShowResult: true } item)
+				item.ShowResultCommand.Execute(null);
+		}
+
 		[DynamicWindowsRuntimeCast(typeof(Button))]
 		private void CloseItemButton_Click(object sender, RoutedEventArgs e)
 		{

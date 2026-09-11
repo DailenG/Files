@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Microsoft.UI.Xaml.Media;
+using System.IO;
 using System.Numerics;
 using System.Windows.Input;
 using WinRT;
@@ -154,6 +155,13 @@ namespace Files.App.Utils.StatusCenter
 
 		public IEnumerable<string>? Destination { get; private set; }
 
+		/// <summary>
+		/// Gets a value indicating whether this card can navigate to the result it produced.
+		/// False while in progress, for failed or cancelled operations, and for operations such as
+		/// delete that have no destination to show.
+		/// </summary>
+		public bool CanShowResult { get; private set; }
+
 		public string? HeaderStringResource { get; private set; }
 
 		public string? SubHeaderStringResource { get; private set; }
@@ -173,6 +181,8 @@ namespace Files.App.Utils.StatusCenter
 		public readonly ObservableCollection<Vector2> SpeedGraphValues;
 
 		public ICommand CancelCommand { get; }
+
+		public ICommand ShowResultCommand { get; }
 
 		[DynamicWindowsRuntimeCast(typeof(SolidColorBrush))]
 		public StatusCenterItem(
@@ -203,9 +213,15 @@ namespace Files.App.Utils.StatusCenter
 			AnimatedIconState = "NormalOff";
 			SpeedGraphValues = [];
 			CancelCommand = new RelayCommand(ExecuteCancelCommand);
+			ShowResultCommand = new AsyncRelayCommand(ExecuteShowResultCommandAsync);
 			Message = Strings.DiscoveringItems.GetLocalizedResource();
 			Source = source;
 			Destination = destination;
+
+			CanShowResult =
+				status is ReturnResult.Success &&
+				HasNavigableDestination(operation) &&
+				destination?.Any(x => !string.IsNullOrWhiteSpace(x)) is true;
 
 			if (Operation is FileOperationType.Git)
 			{
@@ -426,6 +442,65 @@ namespace Files.App.Utils.StatusCenter
 				IsSpeedAndProgressAvailable = false;
 				Header = $"{Strings.Canceling.GetLocalizedResource()} - {Header}";
 			}
+		}
+
+		/// <summary>
+		/// Operations whose <see cref="Destination"/> names something the user can be taken to.
+		/// Delete and recycle are excluded because they produce no destination, and a card that looks
+		/// activatable but does nothing is worse than an inert one.
+		/// </summary>
+		private static bool HasNavigableDestination(FileOperationType operation)
+			=> operation is
+				FileOperationType.Copy or
+				FileOperationType.Move or
+				FileOperationType.Extract or
+				FileOperationType.Compressed;
+
+		/// <summary>
+		/// Navigates to the parent of the produced items and selects them. When the results do not
+		/// share a parent, the parent of the first is opened without a selection.
+		/// </summary>
+		private async Task ExecuteShowResultCommandAsync()
+		{
+			var targets = Destination?.Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+			if (targets is null || targets.Count == 0)
+				return;
+
+			var context = Ioc.Default.GetRequiredService<IContentPageContext>();
+			if (context.ShellPage is not { } shellPage || shellPage.ShellViewModel is not { } shellViewModel)
+				return;
+
+			var parents = targets
+				.Select(x => Path.GetDirectoryName(x))
+				.Where(x => !string.IsNullOrWhiteSpace(x))
+				.Distinct(StringComparer.OrdinalIgnoreCase)
+				.ToList();
+
+			if (parents.Count == 0)
+				return;
+
+			var sharesParent = parents.Count == 1;
+			var folderPath = parents[0]!;
+
+			// The destination may have been deleted, renamed or unmounted since the operation finished
+			if (!await shellViewModel.GetFolderWithPathFromPathAsync(folderPath))
+				return;
+
+			string[] selectItems = sharesParent
+				? [.. targets
+					.Select(x => Path.GetFileName(x.TrimPath()))
+					.Where(x => !string.IsNullOrEmpty(x))
+					.Cast<string>()]
+				: [];
+
+			shellPage.NavigateWithArguments(
+				shellPage.InstanceViewModel.FolderSettings.GetLayoutType(folderPath),
+				new NavigationArguments()
+				{
+					NavPathParam = folderPath,
+					SelectItems = selectItems,
+					AssociatedTabInstance = shellPage
+				});
 		}
 	}
 }
